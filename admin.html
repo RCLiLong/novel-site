@@ -50,7 +50,37 @@
             </button>
             <div style="font-size:12px;color:var(--text-light);margin-top:4px">首次登录自动注册为演示管理员</div>
           </div>
+          <div id="author-register-section" style="display:none;margin-top:12px">
+            <a href="#" onclick="showAuthorRegister();return false" style="font-size:13px;color:var(--accent)">✍️ 申请成为作者（邮箱注册）</a>
+          </div>
         </div>
+      </div>
+
+      <!-- 作者注册面板 -->
+      <div class="admin-section" id="author-register-panel" style="display:none;max-width:420px;margin:60px auto">
+        <h3>✍️ 作者注册 <button class="close-btn" onclick="hideAuthorRegister()">✕</button></h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">使用邮箱注册作者账号，验证邮箱后等待管理员审核通过即可登录。</p>
+        <div class="form-group">
+          <label>邮箱</label>
+          <div style="display:flex;gap:8px">
+            <input type="email" id="reg-email" placeholder="your@email.com" maxlength="200" style="flex:1">
+            <button class="btn" id="reg-send-code-btn" onclick="sendRegCode()" style="white-space:nowrap">发送验证码</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>验证码（6 位）</label>
+          <input type="text" id="reg-code" placeholder="收到的 6 位验证码" maxlength="6" inputmode="numeric" pattern="\d{6}">
+        </div>
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="reg-username" placeholder="字母数字下划线，2-32 位" maxlength="32">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="reg-password" placeholder="至少 8 位，包含字母和数字" maxlength="128">
+        </div>
+        <button class="btn" onclick="doRegister()" style="width:100%">提交注册</button>
+        <div id="reg-msg" style="margin-top:8px"></div>
       </div>
     </div>
 
@@ -418,6 +448,117 @@
         <div id="backup-msg"></div>
       </div>
 
+      <!-- 广告管理（仅超管可见） -->
+      <div class="admin-section super-admin-only" style="display:none">
+        <h3>📢 广告管理</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">在阅读页两侧及返回时的弹窗展示广告。支持自定义 HTML 和 Google AdSense。</p>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="ad-enabled" onchange="toggleAdConfig()"> 启用广告
+          </label>
+        </div>
+        <div id="ad-config" style="display:none">
+          <div class="form-group">
+            <label>广告类型</label>
+            <select id="ad-mode" style="padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+              <option value="custom">自定义 HTML</option>
+              <option value="adsense">Google AdSense</option>
+              <option value="both">两者同时展示</option>
+            </select>
+          </div>
+
+          <div id="ad-custom-config">
+            <details open>
+              <summary style="cursor:pointer;font-size:14px;color:var(--accent);margin-bottom:8px">📝 自定义 HTML 广告</summary>
+              <div class="form-group">
+                <label>左侧广告 HTML（最长 10000 字符）</label>
+                <textarea id="ad-left-html" placeholder='例如：<a href="https://..." target="_blank"><img src="..." style="width:100%"></a>' style="min-height:80px;font-family:monospace;font-size:12px" maxlength="10000"></textarea>
+              </div>
+              <div class="form-group">
+                <label>右侧广告 HTML</label>
+                <textarea id="ad-right-html" placeholder='HTML 片段，留空则不展示' style="min-height:80px;font-family:monospace;font-size:12px" maxlength="10000"></textarea>
+              </div>
+              <div class="form-group">
+                <label>返回弹窗广告 HTML</label>
+                <textarea id="ad-popup-html" placeholder='HTML 片段，留空则不展示弹窗' style="min-height:80px;font-family:monospace;font-size:12px" maxlength="10000"></textarea>
+              </div>
+            </details>
+          </div>
+
+          <div id="ad-adsense-config">
+            <details>
+              <summary style="cursor:pointer;font-size:14px;color:var(--accent);margin-bottom:8px">🔍 Google AdSense 配置</summary>
+              <div style="background:var(--bg);padding:10px;border-radius:var(--radius);margin-bottom:12px;font-size:13px;color:var(--text-light)">
+                需要在 <a href="https://adsense.google.com/" target="_blank" style="color:var(--primary)">AdSense 后台</a> 创建广告单元后，将 Client ID 与各位置的 Slot ID 填入下方。
+              </div>
+              <div class="form-group">
+                <label>Client ID（ca-pub-...）</label>
+                <input type="text" id="ad-adsense-client" placeholder="ca-pub-1234567890" maxlength="100">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                <div class="form-group">
+                  <label>左侧 Slot ID</label>
+                  <input type="text" id="ad-adsense-slot-left" placeholder="可选" maxlength="100">
+                </div>
+                <div class="form-group">
+                  <label>右侧 Slot ID</label>
+                  <input type="text" id="ad-adsense-slot-right" placeholder="可选" maxlength="100">
+                </div>
+                <div class="form-group">
+                  <label>弹窗 Slot ID</label>
+                  <input type="text" id="ad-adsense-slot-popup" placeholder="可选" maxlength="100">
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <details>
+            <summary style="cursor:pointer;font-size:14px;color:var(--accent);margin-bottom:8px">⏱️ 弹窗参数</summary>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="form-group">
+                <label>弹窗显示后倒计时（秒）</label>
+                <input type="number" id="ad-popup-delay" min="0" max="60" value="5">
+                <div style="font-size:12px;color:var(--text-light);margin-top:2px">倒计时结束后才允许关闭</div>
+              </div>
+              <div class="form-group">
+                <label>弹窗冷却间隔（分钟）</label>
+                <input type="number" id="ad-popup-interval" min="0" max="1440" value="30">
+                <div style="font-size:12px;color:var(--text-light);margin-top:2px">同一浏览器在间隔内不重复弹</div>
+              </div>
+            </div>
+          </details>
+        </div>
+        <button class="btn" onclick="saveAdConfig()">保存广告配置</button>
+        <div id="ad-config-msg" style="margin-top:8px"></div>
+      </div>
+
+      <!-- 邮件服务（Resend）+ 作者注册（仅超管可见） -->
+      <div class="admin-section super-admin-only" style="display:none">
+        <h3>✉️ 邮件服务（Resend）</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">配置 Resend 邮件服务用于作者注册邮箱验证。<a href="https://resend.com/api-keys" target="_blank" style="color:var(--accent)">前往 Resend 获取 API Key →</a></p>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="author-reg-enabled"> 启用作者邮箱注册（开放注册）
+          </label>
+          <div style="font-size:12px;color:var(--text-light);margin-top:2px">启用后登录页会显示"作者注册"入口，注册后需管理员审核</div>
+        </div>
+        <div class="form-group">
+          <label>发件人（from）</label>
+          <input type="text" id="email-from" placeholder='例如：noreply@example.com 或 "小说站 <noreply@example.com>"' maxlength="200">
+          <div style="font-size:12px;color:var(--text-light);margin-top:2px">需要在 Resend 后台已验证的域名邮箱</div>
+        </div>
+        <div class="form-group">
+          <label>API Key <span id="email-key-status" style="font-size:12px"></span></label>
+          <input type="password" id="email-api-key" placeholder="留空则保持原值不变 (re_xxx)" maxlength="200">
+        </div>
+        <div class="form-group">
+          <label>邮件主题</label>
+          <input type="text" id="email-subject" placeholder="【小说站】注册验证码" maxlength="200">
+        </div>
+        <button class="btn" onclick="saveEmailConfig()">保存邮件配置</button>
+        <div id="email-config-msg" style="margin-top:8px"></div>
+      </div>
+
       <!-- 管理员管理（仅超管可见） -->
       <div class="admin-section super-admin-only" style="display:none">
         <h3>👥 管理员管理</h3>
@@ -455,11 +596,19 @@
 
       <!-- 作者管理（管理员及超管可见） -->
       <div class="admin-section admin-or-above-only" style="display:none">
-        <h3>✍️ 作者管理</h3>
+        <h3>✍️ 作者管理 <span id="pending-authors-badge" style="display:none;background:#e74c3c;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:6px"></span></h3>
         <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">作者只能管理自己创建的书籍与章节，且无演示账号的数量限制。</p>
+
+        <!-- Tab 切换 -->
+        <div style="display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:12px">
+          <button class="author-tab" data-tab="active" style="background:transparent;border:0;padding:8px 12px;border-bottom:2px solid var(--accent);font-weight:600;color:var(--accent);cursor:pointer">已激活</button>
+          <button class="author-tab" data-tab="pending" style="background:transparent;border:0;padding:8px 12px;border-bottom:2px solid transparent;color:var(--text-light);cursor:pointer">待审核 <span id="pending-tab-count" style="font-size:11px;color:#e74c3c"></span></button>
+          <button class="author-tab" data-tab="rejected" style="background:transparent;border:0;padding:8px 12px;border-bottom:2px solid transparent;color:var(--text-light);cursor:pointer">已拒绝</button>
+        </div>
+
         <div id="authors-list" style="margin-bottom:12px"></div>
         <details style="margin-top:8px">
-          <summary style="cursor:pointer;font-size:14px;color:var(--accent)">+ 添加作者</summary>
+          <summary style="cursor:pointer;font-size:14px;color:var(--accent)">+ 直接创建作者（跳过邮箱审核）</summary>
           <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:8px;align-items:end">
             <div>
               <label style="font-size:12px;color:var(--text-light)">用户名</label>
@@ -470,6 +619,10 @@
               <input type="password" id="new-author-pass" placeholder="至少8位" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
             </div>
             <button class="btn" onclick="createAuthor()">创建</button>
+          </div>
+          <div style="margin-top:6px">
+            <label style="font-size:12px;color:var(--text-light)">邮箱（可选）</label>
+            <input type="email" id="new-author-email" placeholder="author@example.com" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
           </div>
           <div style="margin-top:4px">
             <label style="font-size:12px;color:var(--text-light)">
@@ -570,6 +723,13 @@
           if (el) el.style.display = '';
         }
       }).catch(() => {});
+      // 检查是否启用作者注册
+      fetch('/api/settings?check=register').then(r => r.json()).then(d => {
+        if (d.authorRegistrationEnabled) {
+          const el = document.getElementById('author-register-section');
+          if (el) el.style.display = '';
+        }
+      }).catch(() => {});
     })();
 
     async function doLogin() {
@@ -630,7 +790,7 @@
       const deactivateBtn = document.getElementById('deactivate-account-btn');
       if (deactivateBtn) deactivateBtn.style.display = (role === 'demo' || role === 'author') ? '' : 'none';
       refreshAllBooks(); loadSettings(); loadStats(); loadFontList();
-      if (role === 'super_admin') { loadAdminUsers(); loadGitHubConfig(); }
+      if (role === 'super_admin') { loadAdminUsers(); loadGitHubConfig(); loadAdConfigAdmin(); loadEmailConfig(); }
       if (isAdminOrAbove) { loadAuthors(); }
     }
 
@@ -756,6 +916,148 @@
         document.getElementById('gh-client-secret').value = '';
         loadGitHubConfig();
       } catch(e) { showMsg('gh-config-msg', e.message, 'error'); }
+    }
+
+    // ===== 广告管理 =====
+    function toggleAdConfig() {
+      document.getElementById('ad-config').style.display =
+        document.getElementById('ad-enabled').checked ? '' : 'none';
+    }
+    async function loadAdConfigAdmin() {
+      try {
+        const res = await api('GET', '/api/admin/settings?section=ads');
+        const data = await res.json();
+        if (!res.ok) return;
+        document.getElementById('ad-enabled').checked = !!data.enabled;
+        document.getElementById('ad-mode').value = data.mode || 'custom';
+        document.getElementById('ad-left-html').value = data.leftHtml || '';
+        document.getElementById('ad-right-html').value = data.rightHtml || '';
+        document.getElementById('ad-popup-html').value = data.popupHtml || '';
+        document.getElementById('ad-adsense-client').value = data.adsenseClient || '';
+        document.getElementById('ad-adsense-slot-left').value = data.adsenseSlotLeft || '';
+        document.getElementById('ad-adsense-slot-right').value = data.adsenseSlotRight || '';
+        document.getElementById('ad-adsense-slot-popup').value = data.adsenseSlotPopup || '';
+        document.getElementById('ad-popup-delay').value = data.popupDelay ?? 5;
+        document.getElementById('ad-popup-interval').value = data.popupInterval ?? 30;
+        toggleAdConfig();
+      } catch {}
+    }
+    async function saveAdConfig() {
+      const payload = {
+        enabled: document.getElementById('ad-enabled').checked,
+        mode: document.getElementById('ad-mode').value,
+        leftHtml: document.getElementById('ad-left-html').value,
+        rightHtml: document.getElementById('ad-right-html').value,
+        popupHtml: document.getElementById('ad-popup-html').value,
+        adsenseClient: document.getElementById('ad-adsense-client').value.trim(),
+        adsenseSlotLeft: document.getElementById('ad-adsense-slot-left').value.trim(),
+        adsenseSlotRight: document.getElementById('ad-adsense-slot-right').value.trim(),
+        adsenseSlotPopup: document.getElementById('ad-adsense-slot-popup').value.trim(),
+        popupDelay: Number(document.getElementById('ad-popup-delay').value) || 0,
+        popupInterval: Number(document.getElementById('ad-popup-interval').value) || 0,
+      };
+      try {
+        const res = await api('POST', '/api/admin/settings?section=ads', payload);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('ad-config-msg', '广告配置已保存', 'success');
+      } catch(e) { showMsg('ad-config-msg', e.message, 'error'); }
+    }
+
+    // ===== 邮件服务（Resend）配置 =====
+    async function loadEmailConfig() {
+      try {
+        const res = await api('GET', '/api/admin/settings?section=email');
+        const data = await res.json();
+        if (!res.ok) return;
+        document.getElementById('author-reg-enabled').checked = !!data.registrationEnabled;
+        document.getElementById('email-from').value = data.from || '';
+        document.getElementById('email-subject').value = data.subject || '';
+        document.getElementById('email-key-status').textContent = data.hasApiKey ? '（已配置 ✅）' : '（未配置）';
+      } catch {}
+    }
+    async function saveEmailConfig() {
+      const registrationEnabled = document.getElementById('author-reg-enabled').checked;
+      const from = document.getElementById('email-from').value.trim();
+      const apiKey = document.getElementById('email-api-key').value.trim();
+      const subject = document.getElementById('email-subject').value.trim();
+      if (registrationEnabled && !from) return showMsg('email-config-msg', '启用注册需填写发件人邮箱', 'error');
+      try {
+        const res = await api('POST', '/api/admin/settings?section=email', {
+          registrationEnabled, from, apiKey: apiKey || undefined, subject
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('email-config-msg', '邮件配置已保存', 'success');
+        document.getElementById('email-api-key').value = '';
+        loadEmailConfig();
+      } catch(e) { showMsg('email-config-msg', e.message, 'error'); }
+    }
+
+    // ===== 作者注册（登录页入口） =====
+    function showAuthorRegister() {
+      document.querySelector('#login-panel > .admin-section').style.display = 'none';
+      document.getElementById('author-register-panel').style.display = '';
+    }
+    function hideAuthorRegister() {
+      document.querySelector('#login-panel > .admin-section').style.display = '';
+      document.getElementById('author-register-panel').style.display = 'none';
+    }
+    let _regSendCooldown = 0;
+    async function sendRegCode() {
+      const email = document.getElementById('reg-email').value.trim();
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        return showMsg('reg-msg', '请填写正确的邮箱', 'error');
+      }
+      const btn = document.getElementById('reg-send-code-btn');
+      btn.disabled = true; btn.textContent = '发送中...';
+      try {
+        const res = await fetch('/api/auth/register?action=send-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('reg-msg', '验证码已发送，请查收邮箱', 'success');
+        // 倒计时 60 秒
+        _regSendCooldown = 60;
+        const timer = setInterval(() => {
+          _regSendCooldown -= 1;
+          btn.textContent = `${_regSendCooldown}s 后重发`;
+          if (_regSendCooldown <= 0) {
+            clearInterval(timer);
+            btn.disabled = false;
+            btn.textContent = '发送验证码';
+          }
+        }, 1000);
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '发送验证码';
+        showMsg('reg-msg', e.message, 'error');
+      }
+    }
+    async function doRegister() {
+      const email = document.getElementById('reg-email').value.trim();
+      const code = document.getElementById('reg-code').value.trim();
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-password').value;
+      if (!email || !code || !username || !password) return showMsg('reg-msg', '请填写完整信息', 'error');
+      if (!/^\d{6}$/.test(code)) return showMsg('reg-msg', '验证码为 6 位数字', 'error');
+      if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+        return showMsg('reg-msg', '密码至少 8 位且包含字母和数字', 'error');
+      }
+      try {
+        const res = await fetch('/api/auth/register?action=verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code, username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('reg-msg', '注册成功！等待管理员审核通过后即可登录', 'success');
+        setTimeout(() => {
+          hideAuthorRegister();
+          document.getElementById('login-user').value = username;
+        }, 3000);
+      } catch (e) { showMsg('reg-msg', e.message, 'error'); }
     }
 
     // ===== TXT导入 =====
@@ -1509,21 +1811,41 @@
 
     // ===== 作者管理 =====
     let _authorsCache = [];
+    let _currentAuthorTab = 'active';
     async function loadAuthors() {
       const el = document.getElementById('authors-list');
       if (!el) return;
       try {
-        const res = await api('GET', '/api/admin/authors');
+        const res = await api('GET', '/api/admin/authors?status=' + encodeURIComponent(_currentAuthorTab));
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         const authors = data.authors || [];
         _authorsCache = authors;
+
+        // 更新待审核角标
+        const pendingCount = data.pendingCount || 0;
+        const badge = document.getElementById('pending-authors-badge');
+        const tabCount = document.getElementById('pending-tab-count');
+        if (badge) {
+          if (pendingCount > 0) { badge.style.display = ''; badge.textContent = pendingCount + ' 待审'; }
+          else badge.style.display = 'none';
+        }
+        if (tabCount) tabCount.textContent = pendingCount > 0 ? `(${pendingCount})` : '';
+
         if (authors.length === 0) {
-          el.innerHTML = '<p style="color:var(--text-light);font-size:13px">暂无作者，可在下方添加</p>';
+          const emptyMsg = _currentAuthorTab === 'pending' ? '暂无待审核作者'
+            : _currentAuthorTab === 'rejected' ? '暂无已拒绝作者'
+            : '暂无作者，可在下方添加';
+          el.innerHTML = `<p style="color:var(--text-light);font-size:13px">${emptyMsg}</p>`;
           return;
         }
         const canReset = currentRole === 'super_admin';
-        el.innerHTML = '<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:6px">用户名</th><th style="text-align:left;padding:6px">书籍</th><th style="text-align:left;padding:6px">字数</th><th style="text-align:left;padding:6px">密码</th><th style="text-align:left;padding:6px">创建时间</th><th style="text-align:right;padding:6px">操作</th></tr></thead><tbody>' +
+        const isPending = _currentAuthorTab === 'pending';
+        const isRejected = _currentAuthorTab === 'rejected';
+
+        el.innerHTML = '<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:6px">用户名</th><th style="text-align:left;padding:6px">邮箱</th>' +
+          (isPending || isRejected ? '' : '<th style="text-align:left;padding:6px">书籍</th><th style="text-align:left;padding:6px">字数</th><th style="text-align:left;padding:6px">密码</th>') +
+          '<th style="text-align:left;padding:6px">创建时间</th><th style="text-align:right;padding:6px">操作</th></tr></thead><tbody>' +
           authors.map(a => {
             const bookCount = a.book_count || 0;
             const totalWords = a.total_words || 0;
@@ -1531,19 +1853,35 @@
             const bookInfo = bookCount > 0
               ? `<span style="cursor:pointer;color:var(--accent)" class="btn-view-author-books" title="查看书籍">${bookCount} 本</span>`
               : '<span style="color:var(--text-light)">0</span>';
-            const resetBtn = canReset
-              ? ' <button class="btn btn-sm btn-reset-author-pwd" style="font-size:11px;padding:1px 6px">重置密码</button>'
-              : '';
-            return `<tr data-id="${a.id}" data-name="${esc(a.username)}" data-lock="${a.password_locked ? 1 : 0}" style="border-bottom:1px solid var(--border)">
-              <td style="padding:6px">${esc(a.username)}</td>
+            const emailCell = a.email ? esc(a.email) : '<span style="color:var(--text-light)">-</span>';
+
+            let actions = '';
+            if (isPending) {
+              actions = '<button class="btn btn-sm btn-approve-author" style="background:#27ae60;color:#fff">通过</button> ' +
+                        '<button class="btn btn-sm btn-reject-author" style="background:#e67e22;color:#fff">拒绝</button> ' +
+                        '<button class="btn btn-sm btn-danger btn-delete-author">删除</button>';
+            } else if (isRejected) {
+              actions = '<button class="btn btn-sm btn-approve-author" style="background:#27ae60;color:#fff">恢复</button> ' +
+                        '<button class="btn btn-sm btn-danger btn-delete-author">删除</button>';
+            } else {
+              const resetBtn = canReset ? ' <button class="btn btn-sm btn-reset-author-pwd" style="font-size:11px;padding:1px 6px">重置密码</button>' : '';
+              actions = resetBtn + '<button class="btn btn-sm btn-danger btn-delete-author" style="margin-left:4px">删除</button>';
+            }
+
+            const middleCells = (isPending || isRejected) ? '' : `
               <td style="padding:6px;font-size:13px">${bookInfo}</td>
               <td style="padding:6px;font-size:13px;color:var(--text-light)">${wordsText}</td>
               <td style="padding:6px">
                 <span title="${a.password_locked ? '密码已锁定' : '密码可修改'}">${a.password_locked ? '🔒' : '🔓'}</span>
                 <button class="btn btn-sm btn-toggle-author-pwd-lock" style="font-size:11px;padding:1px 6px">${a.password_locked ? '解锁' : '锁定'}</button>
-              </td>
+              </td>`;
+
+            return `<tr data-id="${a.id}" data-name="${esc(a.username)}" data-lock="${a.password_locked ? 1 : 0}" style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px">${esc(a.username)}</td>
+              <td style="padding:6px;font-size:13px">${emailCell}</td>
+              ${middleCells}
               <td style="padding:6px;color:var(--text-light);font-size:12px">${a.created_at ? a.created_at.slice(0,10) : '-'}</td>
-              <td style="padding:6px;text-align:right">${resetBtn}<button class="btn btn-sm btn-danger btn-delete-author" style="margin-left:4px">删除</button></td>
+              <td style="padding:6px;text-align:right">${actions}</td>
             </tr>`;
           }).join('') +
           '</tbody></table>';
@@ -1551,6 +1889,22 @@
         el.innerHTML = `<p style="color:var(--danger,#e74c3c);font-size:13px">加载失败：${esc(e.message)}</p>`;
       }
     }
+
+    // Tab 切换
+    document.querySelectorAll('.author-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.author-tab').forEach(b => {
+          b.style.borderBottomColor = 'transparent';
+          b.style.color = 'var(--text-light)';
+          b.style.fontWeight = 'normal';
+        });
+        btn.style.borderBottomColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+        btn.style.fontWeight = '600';
+        _currentAuthorTab = btn.dataset.tab;
+        loadAuthors();
+      });
+    });
 
     // 作者列表事件委托
     document.getElementById('authors-list').addEventListener('click', function(e) {
@@ -1567,24 +1921,42 @@
         resetAuthorPwd(id, name);
       } else if (e.target.classList.contains('btn-view-author-books')) {
         showUserBooks(id, name);
+      } else if (e.target.classList.contains('btn-approve-author')) {
+        reviewAuthor(id, name, 'approve');
+      } else if (e.target.classList.contains('btn-reject-author')) {
+        reviewAuthor(id, name, 'reject');
       }
     });
+
+    async function reviewAuthor(id, username, action) {
+      const word = action === 'approve' ? '通过' : '拒绝';
+      if (!confirm(`确定${word}作者「${username}」？`)) return;
+      try {
+        const res = await api('PUT', '/api/admin/authors', { id, action });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        loadAuthors();
+      } catch(e) { alert(e.message); }
+    }
 
     async function createAuthor() {
       const username = document.getElementById('new-author-user').value.trim();
       const password = document.getElementById('new-author-pass').value;
+      const email = document.getElementById('new-author-email')?.value.trim() || '';
       const pwdLock = document.getElementById('new-author-pwd-lock').checked;
       if (!username || !password) return showMsg('author-user-msg', '请填写用户名和密码', 'error');
       try {
-        const res = await api('POST', '/api/admin/authors', { username, password, password_locked: pwdLock ? 1 : 0 });
+        const res = await api('POST', '/api/admin/authors', {
+          username, password, email: email || undefined, password_locked: pwdLock ? 1 : 0
+        });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
         showMsg('author-user-msg', data.message, 'success');
         document.getElementById('new-author-user').value = '';
         document.getElementById('new-author-pass').value = '';
+        if (document.getElementById('new-author-email')) document.getElementById('new-author-email').value = '';
         document.getElementById('new-author-pwd-lock').checked = false;
         loadAuthors();
-        // 同时刷新管理员列表（如果在显示）
         if (currentRole === 'super_admin') loadAdminUsers();
       } catch(e) { showMsg('author-user-msg', e.message, 'error'); }
     }

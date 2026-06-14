@@ -21,9 +21,13 @@ export async function onRequestPost(context) {
     const result = await login(env, username.trim(), password, ip);
 
     if (!result.ok) {
-      const status = result.reason === 'locked' ? 429 : 401;
+      const status = result.reason === 'locked' ? 429
+        : result.reason === 'pending' || result.reason === 'rejected' ? 403
+        : 401;
       const msg = result.reason === 'locked' ? '登录失败次数过多，请10分钟后再试'
         : result.reason === 'github_only' ? '该账号请使用 GitHub 登录'
+        : result.reason === 'pending' ? '账号正在等待管理员审核，通过后即可登录'
+        : result.reason === 'rejected' ? '账号未通过审核'
         : '用户名或密码错误';
       return Response.json({ error: msg }, { status });
     }

@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
   username TEXT UNIQUE NOT NULL,          -- 用户名，唯一
   password_hash TEXT NOT NULL,            -- 密码哈希
   role TEXT DEFAULT 'editor',             -- 角色: super_admin/admin/author/demo（editor 为旧 admin 别名）
+  email TEXT UNIQUE,                      -- 邮箱（作者注册时填写，唯一）
+  status TEXT DEFAULT 'active',           -- 账号状态: active / pending（待审核）/ rejected（已拒绝）
   github_id TEXT UNIQUE,                  -- GitHub OAuth ID
   github_login TEXT,                      -- GitHub用户名
   avatar_url TEXT,                        -- 头像URL
@@ -97,6 +99,28 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_user_id ON admin_sessions(user_id)
 
 -- GitHub OAuth索引
 CREATE INDEX IF NOT EXISTS idx_admin_users_github_id ON admin_users(github_id);
+
+-- 待验证注册表：邮箱验证码注册流程的临时存储（作者注册）
+-- 字段说明:
+--   email: 注册邮箱
+--   code_hash: 验证码 SHA-256 哈希（含 email 加盐）
+--   ip_hash: 请求来源 IP 哈希（用于限流）
+--   attempts: 验证尝试次数（>=5 失效）
+--   verified: 是否已使用
+--   expires_at: 验证码过期时间（10 分钟）
+CREATE TABLE IF NOT EXISTS pending_registrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  username TEXT,
+  password_hash TEXT,
+  ip_hash TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  verified INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pending_reg_email ON pending_registrations(email, expires_at);
 
 -- ============================================================
 -- 系统配置表

@@ -49,10 +49,19 @@
 
 **权限系统**
 - 👑 超级管理员（super_admin）：全部权限，管理用户/设置/字体
-- 👤 管理员（admin）：管理所有书籍/章节/标签
+- 👤 管理员（admin）：管理所有书籍/章节/标签，可审核作者
+- ✍️ 作者（author）：只能管理自己的书籍/章节，无数量配额，支持邮箱注册
 - 🎭 演示管理员（demo）：只能管理自己创建的内容，10 本书 / 每本 200 章配额
 - 🔑 GitHub OAuth 登录：一键注册 demo 账号（站内配置 Client ID/Secret）
-- 🚪 Demo 自助注销：注销后内容自动转交超管保管
+- ✉️ 邮箱注册作者：Resend 验证码 + 管理员审核（站内配置 API Key）
+- 🚪 Demo / Author 自助注销：注销后内容自动转交超管保管
+
+**广告系统**
+- 📢 后台可视化配置广告（仅超管），支持启用/禁用全局开关
+- 🖼️ 阅读页两侧固定广告位（窄屏自动隐藏，沉浸模式隐藏）
+- 🔔 返回弹窗广告：从其他页/标签切回时触发，倒计时后才可关闭
+- 🎨 三种接入模式：自定义 HTML / Google AdSense / 两者同时
+- ⏱️ 弹窗冷却时间可配置（默认 30 分钟，每浏览器独立计时）
 
 **批注系统**
 - 💬 选中文字发表批注（公开/私有），浮动按钮触发
@@ -150,6 +159,23 @@ wrangler pages deploy .
 3. 登录管理后台 → 设置 → GitHub OAuth → 填入 Client ID 和 Client Secret → 启用
 4. 推荐将 Client Secret 设为环境变量 `GITHUB_CLIENT_SECRET`（比存数据库更安全）
 
+### 可选：启用作者邮箱注册（Resend）
+
+1. 注册 [Resend](https://resend.com) 并验证你的发件域名
+2. 在 Resend 后台获取 API Key（`re_xxxxx`）
+3. 登录管理后台 → 邮件服务 → 填入发件人邮箱与 API Key → 勾选"启用作者邮箱注册"
+4. 可选：将 API Key 设为环境变量 `RESEND_API_KEY`、发件人设为 `RESEND_FROM`（优先于 DB）
+5. 注册流程：用户输入邮箱获取验证码 → 提交用户名/密码 → 管理员后台审核通过后即可登录
+
+### 可选：启用广告
+
+1. 登录管理后台 → 广告管理 → 勾选"启用广告"
+2. 选择广告类型：自定义 HTML、Google AdSense 或两者同时
+3. **自定义 HTML**：填入左侧/右侧/弹窗的 HTML 片段（最长 10000 字符，支持 `<img>` `<a>` `<iframe>` 等）
+4. **Google AdSense**：填入 `ca-pub-xxxx` Client ID 与各位置的 Slot ID（脚本自动加载）
+5. 弹窗参数：倒计时（默认 5 秒）+ 冷却间隔（默认 30 分钟，每浏览器独立计时）
+6. 阅读页两侧广告在屏幕宽度小于 1100px 时自动隐藏，沉浸模式下完全隐藏
+
 ## 📖 深入了解
 
 ### 为什么用 D1 + R2 两个存储？
@@ -194,6 +220,7 @@ novel-site/
         ├── auth/
         │   ├── github/
         │   │   └── callback.js # GitHub OAuth 回调
+        │   ├── register.js # 作者邮箱注册（发送验证码 + 校验）
         │   └── logout.js  # 登出（清除 Cookie + Session）
         ├── books/
         │   └── [id].js     # 书籍详情 + 章节列表 + 标签
@@ -209,14 +236,15 @@ novel-site/
         │   └── [id]/
         │       └── like.js # 点赞/取消点赞
         └── admin/          # 管理 API（需登录）
-            ├── account.js  # Demo 用户自助注销
+            ├── account.js  # Demo / Author 用户自助注销
             ├── books.js    # 创建书籍（含配额检查）
-            ├── settings.js # 站点设置 + GitHub OAuth 配置
+            ├── settings.js # 站点设置 + GitHub OAuth + 广告 + 邮件配置
             ├── fonts.js    # 字体上传/删除（仅超管）
             ├── tags.js     # 标签管理（仅管理员+）
             ├── covers.js   # 封面上传（MIME白名单+魔数验证）
             ├── stats.js    # 访问统计
             ├── users.js    # 多管理员管理（仅超管）
+            ├── authors.js  # 作者管理（admin+ 可创建/审核/删除）
             ├── book-tags.js # 书籍标签关联（含tag存在性验证）
             ├── books/
             │   └── [id].js # 编辑/删除书籍（含所有权检查）
@@ -245,10 +273,11 @@ novel-site/
 |---|---|
 | `books` | 书籍元数据（标题、作者、封面key、所有者） |
 | `chapters` | 章节元数据（标题、排序、字数、R2路径、version乐观锁） |
-| `admin_users` | 管理员账号（PBKDF2哈希、角色、GitHub OAuth信息） |
+| `admin_users` | 管理员账号（PBKDF2哈希、角色、GitHub/邮箱、status：active/pending/rejected） |
 | `admin_sessions` | 登录会话（token SHA-256哈希，7天过期） |
+| `pending_registrations` | 邮箱注册验证码（10 分钟过期，最多 5 次验证） |
 | `tags` / `book_tags` | 标签系统 |
-| `site_settings` | 站点配置 + GitHub OAuth配置 |
+| `site_settings` | 站点配置 + GitHub OAuth + 广告 + Resend 邮件配置 |
 | `auth_attempts` | 登录限流（IP哈希 + 失败计数） |
 | `annotations` | 批注（章节定位 + 内容 + 可见性 + 状态） |
 | `annotation_likes` | 批注点赞（用户唯一约束） |

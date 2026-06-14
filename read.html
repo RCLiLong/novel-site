@@ -23,9 +23,29 @@
       <span id="nav-user"></span>
     </nav>
   </div>
+
+  <!-- 阅读页两侧广告位 -->
+  <aside class="reader-ad reader-ad-left" id="reader-ad-left" style="display:none" aria-label="广告">
+    <div class="reader-ad-inner" id="reader-ad-left-inner"></div>
+  </aside>
+  <aside class="reader-ad reader-ad-right" id="reader-ad-right" style="display:none" aria-label="广告">
+    <div class="reader-ad-inner" id="reader-ad-right-inner"></div>
+  </aside>
+
   <div class="reader" id="reader-area">
     <div class="breadcrumb" id="breadcrumb"></div>
     <div id="content" class="loading">加载中...</div>
+  </div>
+
+  <!-- 返回弹窗广告 -->
+  <div class="ad-popup-overlay" id="ad-popup-overlay" style="display:none">
+    <div class="ad-popup">
+      <div class="ad-popup-header">
+        <span class="ad-popup-label">广告</span>
+        <button class="ad-popup-close" id="ad-popup-close" disabled title="请稍候...">✕ <span id="ad-popup-countdown">5</span></button>
+      </div>
+      <div class="ad-popup-body" id="ad-popup-body"></div>
+    </div>
   </div>
 
   <!-- 底部工具栏 -->
@@ -144,6 +164,151 @@
     let canAnnotate = false; // 当前书籍是否可批注
     let currentBookId = null;
     let currentChapterId = null;
+
+    // ===== 广告管理 =====
+    let _adConfig = null;
+    let _adsenseScriptLoaded = false;
+
+    function loadAdsenseScript(client) {
+      if (_adsenseScriptLoaded || !client) return;
+      _adsenseScriptLoaded = true;
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
+      s.crossOrigin = 'anonymous';
+      s.referrerPolicy = 'no-referrer-when-downgrade';
+      document.head.appendChild(s);
+    }
+
+    function buildAdsenseSlot(client, slot) {
+      if (!client || !slot) return '';
+      return `<ins class="adsbygoogle" style="display:block;width:100%;height:100%;min-height:300px" data-ad-client="${client}" data-ad-slot="${slot}" data-ad-format="auto" data-full-width-responsive="true"></ins>`;
+    }
+
+    function pushAdsenseAd(container) {
+      try {
+        const ins = container.querySelector('ins.adsbygoogle');
+        if (ins) {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        }
+      } catch (e) { console.warn('AdSense push failed', e); }
+    }
+
+    function renderAdSlot(target, slot, customHtml, adsenseSlot) {
+      if (!target) return false;
+      const cfg = _adConfig;
+      if (!cfg || !cfg.enabled) return false;
+      const useCustom = customHtml && (cfg.mode === 'custom' || cfg.mode === 'both');
+      const useAdsense = adsenseSlot && cfg.adsenseClient && (cfg.mode === 'adsense' || cfg.mode === 'both');
+      if (!useCustom && !useAdsense) return false;
+      let html = '';
+      if (useCustom) html += customHtml;
+      if (useAdsense) {
+        if (useCustom) html += '<div style="height:8px"></div>';
+        html += buildAdsenseSlot(cfg.adsenseClient, adsenseSlot);
+      }
+      target.innerHTML = html;
+      if (useAdsense) {
+        loadAdsenseScript(cfg.adsenseClient);
+        // 延迟一帧再 push，等 script 注入完成
+        setTimeout(() => pushAdsenseAd(target), 0);
+      }
+      return true;
+    }
+
+    async function loadAdConfig() {
+      try {
+        const res = await fetch('/api/settings?check=ads');
+        if (!res.ok) return;
+        _adConfig = await res.json();
+      } catch { _adConfig = null; }
+      if (!_adConfig || !_adConfig.enabled) return;
+
+      // 渲染左右广告
+      const leftSlot = document.getElementById('reader-ad-left');
+      const rightSlot = document.getElementById('reader-ad-right');
+      const leftInner = document.getElementById('reader-ad-left-inner');
+      const rightInner = document.getElementById('reader-ad-right-inner');
+      if (leftInner && renderAdSlot(leftInner, 'left', _adConfig.leftHtml, _adConfig.adsenseSlotLeft)) {
+        leftSlot.style.display = '';
+      }
+      if (rightInner && renderAdSlot(rightInner, 'right', _adConfig.rightHtml, _adConfig.adsenseSlotRight)) {
+        rightSlot.style.display = '';
+      }
+    }
+
+    // ===== 返回弹窗广告 =====
+    const AD_POPUP_KEY = 'lastAdPopupAt';
+    function getAdPopupBody() { return document.getElementById('ad-popup-body'); }
+    function showReturnPopup() {
+      if (!_adConfig || !_adConfig.enabled) return;
+      // 频率控制（按配置的分钟数）
+      const intervalMs = (_adConfig.popupInterval || 30) * 60 * 1000;
+      const last = Number(localStorage.getItem(AD_POPUP_KEY) || 0);
+      if (intervalMs > 0 && Date.now() - last < intervalMs) return;
+
+      const overlay = document.getElementById('ad-popup-overlay');
+      const body = getAdPopupBody();
+      const closeBtn = document.getElementById('ad-popup-close');
+      const cd = document.getElementById('ad-popup-countdown');
+      if (!overlay || !body) return;
+
+      if (!renderAdSlot(body, 'popup', _adConfig.popupHtml, _adConfig.adsenseSlotPopup)) return;
+
+      overlay.style.display = 'flex';
+      localStorage.setItem(AD_POPUP_KEY, String(Date.now()));
+
+      // 倒计时
+      let remaining = Math.max(0, _adConfig.popupDelay || 5);
+      closeBtn.disabled = remaining > 0;
+      cd.textContent = remaining;
+      if (remaining <= 0) {
+        cd.textContent = '';
+      } else {
+        const timer = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(timer);
+            closeBtn.disabled = false;
+            cd.textContent = '';
+            closeBtn.title = '关闭';
+          } else {
+            cd.textContent = remaining;
+          }
+        }, 1000);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const overlay = document.getElementById('ad-popup-overlay');
+      const closeBtn = document.getElementById('ad-popup-close');
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          if (closeBtn.disabled) return;
+          overlay.style.display = 'none';
+          const body = getAdPopupBody();
+          if (body) body.innerHTML = '';
+        });
+      }
+    });
+
+    // 当用户从其他页面返回（含浏览器返回 / 标签切换）时触发
+    let _wasHidden = false;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        _wasHidden = true;
+      } else if (document.visibilityState === 'visible' && _wasHidden) {
+        _wasHidden = false;
+        showReturnPopup();
+      }
+    });
+    window.addEventListener('pageshow', (e) => {
+      // bfcache 恢复：触发一次弹窗（仅当从其他页返回时）
+      if (e.persisted) showReturnPopup();
+    });
+
+    // 启动时加载广告配置
+    loadAdConfig();
 
     async function fetchCurrentUser() {
       const navUser = document.getElementById('nav-user');

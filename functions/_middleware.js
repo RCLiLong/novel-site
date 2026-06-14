@@ -51,7 +51,17 @@ export async function onRequest(context) {
 
     // 安全头
     response.headers.set('X-Frame-Options', 'DENY');
-    response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://avatars.githubusercontent.com; font-src 'self'; frame-ancestors 'none'");
+    // CSP：允许 Google AdSense 与常见广告资源（自定义广告通常引用 https 图片/iframe）
+    response.headers.set('Content-Security-Policy', [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://www.googletagservices.com https://googleads.g.doubleclick.net",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net",
+      "frame-src https://googleads.g.doubleclick.net https://www.google.com https://tpc.googlesyndication.com",
+      "frame-ancestors 'none'"
+    ].join('; '));
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
     response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');

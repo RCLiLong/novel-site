@@ -166,6 +166,30 @@ async function ensureSchema(env) {
     try { await env.DB.prepare('ALTER TABLE books ADD COLUMN annotation_enabled INTEGER NOT NULL DEFAULT 0').run(); } catch {}
     try { await env.DB.prepare('ALTER TABLE books ADD COLUMN annotation_locked INTEGER NOT NULL DEFAULT 0').run(); } catch {}
 
+    // ===== 作者邮箱注册系统 =====
+    // admin_users：邮箱 + 状态字段
+    try { await env.DB.prepare('ALTER TABLE admin_users ADD COLUMN email TEXT DEFAULT NULL').run(); } catch {}
+    try { await env.DB.prepare("ALTER TABLE admin_users ADD COLUMN status TEXT DEFAULT 'active'").run(); } catch {}
+    try { await env.DB.prepare("UPDATE admin_users SET status = 'active' WHERE status IS NULL").run(); } catch {}
+    try { await env.DB.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email) WHERE email IS NOT NULL').run(); } catch {}
+
+    // 待验证注册表：邮箱验证码流程的临时存储
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS pending_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        code_hash TEXT NOT NULL,
+        username TEXT,
+        password_hash TEXT,
+        ip_hash TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        verified INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_pending_reg_email ON pending_registrations(email, expires_at)').run(); } catch {}
+
     // 所有迁移成功完成，标记为已完成
     _schemaEnsured = true;
   } catch (e) {
@@ -229,13 +253,21 @@ export async function checkAdmin(request, env) {
   // 对token做哈希后查找
   const tokenHash = await sha256Hash(token);
   const session = await env.DB.prepare(
-    "SELECT s.user_id, s.expires_at, u.username, u.role, u.password_locked FROM admin_sessions s JOIN admin_users u ON s.user_id = u.id WHERE s.token = ?"
+    "SELECT s.user_id, s.expires_at, u.username, u.role, u.password_locked, u.status FROM admin_sessions s JOIN admin_users u ON s.user_id = u.id WHERE s.token = ?"
   ).bind(tokenHash).first();
 
   if (!session) return { ok: false, reason: 'invalid_token' };
   if (new Date(session.expires_at) < new Date()) {
     await env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(tokenHash).run();
     return { ok: false, reason: 'expired' };
+  }
+
+  // 账号状态校验：pending / rejected 用户不能使用任何受保护接口
+  const userStatus = session.status || 'active';
+  if (userStatus === 'pending' || userStatus === 'rejected') {
+    // 主动清理 session，避免每次都查 DB
+    await env.DB.prepare('DELETE FROM admin_sessions WHERE token = ?').bind(tokenHash).run().catch(() => {});
+    return { ok: false, reason: userStatus };
   }
 
   // 按概率清理过期session和限流记录
@@ -259,7 +291,7 @@ export async function login(env, username, password, ip) {
 
   await ensureDefaultAdmin(env);
 
-  const user = await env.DB.prepare('SELECT id, password_hash, role FROM admin_users WHERE username = ?')
+  const user = await env.DB.prepare('SELECT id, password_hash, role, status FROM admin_users WHERE username = ?')
     .bind(username).first();
 
   if (!user) {
@@ -286,6 +318,19 @@ export async function login(env, username, password, ip) {
     await recordFailedAttempt(env, ipHash);
     await recordFailedAttempt(env, usernameHash);
     return { ok: false, reason: 'wrong' };
+  }
+
+  // 账号状态校验（在密码校验通过后，避免泄漏用户存在性）
+  const userStatus = user.status || 'active';
+  if (userStatus === 'pending') {
+    await clearFailedAttempts(env, ipHash);
+    await clearFailedAttempts(env, usernameHash);
+    return { ok: false, reason: 'pending' };
+  }
+  if (userStatus === 'rejected') {
+    await clearFailedAttempts(env, ipHash);
+    await clearFailedAttempts(env, usernameHash);
+    return { ok: false, reason: 'rejected' };
   }
 
   if (result.needsMigration) {
