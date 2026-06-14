@@ -35,7 +35,7 @@ export async function onRequestPost(context) {
   if (password.length > 128) return Response.json({ error: '密码最长128位' }, { status: 400 });
   if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) return Response.json({ error: '密码需包含字母和数字' }, { status: 400 });
 
-  const validRoles = ['super_admin', 'admin', 'demo'];
+  const validRoles = ['super_admin', 'admin', 'author', 'demo'];
   const userRole = validRoles.includes(role) ? role : 'demo';
   const pwdLocked = password_locked === 1 ? 1 : 0;
 
@@ -90,7 +90,7 @@ export async function onRequestDelete(context) {
 // 定义允许更新的字段白名单及其验证函数
 const ALLOWED_UPDATE_FIELDS = {
   'role': {
-    validate: (v) => ['super_admin', 'admin', 'demo'].includes(v),
+    validate: (v) => ['super_admin', 'admin', 'author', 'demo'].includes(v),
     errorMsg: '无效的角色值'
   },
   'password_locked': {

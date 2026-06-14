@@ -79,6 +79,7 @@
       display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px;
     }
     .badge-demo { background: #fef3c7; color: #92400e; }
+    .badge-author { background: #e0e7ff; color: #4338ca; }
     .badge-admin { background: #dbeafe; color: #1e40af; }
     .badge-super { background: #fce7f3; color: #9d174d; }
     .badge-private { background: #f3f4f6; color: #6b7280; }
@@ -367,6 +368,7 @@
     function renderAnnoItem(a) {
       const roleBadge = a.user_role === 'super_admin' ? '<span class="badge badge-super">超管</span>' :
                         a.user_role === 'admin' ? '<span class="badge badge-admin">管理</span>' :
+                        a.user_role === 'author' ? '<span class="badge badge-author">作者</span>' :
                         a.user_role === 'demo' ? '<span class="badge badge-demo">demo</span>' : '';
       const statusBadge = a.status === 'reported' ? '<span class="badge badge-reported">⚠️举报</span>' :
                           a.status === 'removed' ? '<span class="badge badge-removed">🚫已移除</span>' : '';
@@ -658,6 +660,7 @@
       };
       const roleBadge = r.anno_user_role === 'super_admin' ? '<span class="badge badge-super">超管</span>' :
                         r.anno_user_role === 'admin' ? '<span class="badge badge-admin">管理</span>' :
+                        r.anno_user_role === 'author' ? '<span class="badge badge-author">作者</span>' :
                         r.anno_user_role === 'demo' ? '<span class="badge badge-demo">demo</span>' : '';
       const isPending = r.status === 'pending' || r.status === 'escalated';
 

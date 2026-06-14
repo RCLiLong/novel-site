@@ -1,4 +1,4 @@
-// DELETE /api/admin/account — demo用户自助注销
+// DELETE /api/admin/account — demo / author 用户自助注销
 import { checkAdmin, requireMinRole } from '../_utils.js';
 
 export async function onRequestDelete(context) {
@@ -7,7 +7,7 @@ export async function onRequestDelete(context) {
   const auth = await checkAdmin(request, env);
   if (!auth.ok) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // 只有 demo 用户可以自助注销
+  // 只有 demo / author 用户可以自助注销
   if (requireMinRole(auth, 'admin')) {
     return Response.json({ error: '管理员及以上角色请联系超级管理员注销' }, { status: 403 });
   }

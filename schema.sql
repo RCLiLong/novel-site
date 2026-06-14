@@ -63,7 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_chapters_sort_order ON chapters(book_id, sort_ord
 --   id: 主键，自增
 --   username: 用户名，唯一
 --   password_hash: 密码哈希（PBKDF2格式）
---   role: 角色（super_admin/admin/demo）
+--   role: 角色（super_admin/admin/author/demo）
 --   github_id: GitHub OAuth用户ID
 --   github_login: GitHub用户名
 --   avatar_url: 头像URL
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS admin_users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,          -- 用户名，唯一
   password_hash TEXT NOT NULL,            -- 密码哈希
-  role TEXT DEFAULT 'editor',             -- 角色: super_admin/admin/demo
+  role TEXT DEFAULT 'editor',             -- 角色: super_admin/admin/author/demo（editor 为旧 admin 别名）
   github_id TEXT UNIQUE,                  -- GitHub OAuth ID
   github_login TEXT,                      -- GitHub用户名
   avatar_url TEXT,                        -- 头像URL

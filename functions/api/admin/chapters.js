@@ -1,5 +1,5 @@
 // POST /api/admin/chapters — 创建新章节
-import { checkAdmin, validateId, parseJsonBody, checkBookOwnership, requireMinRole } from '../_utils.js';
+import { checkAdmin, validateId, parseJsonBody, checkBookOwnership } from '../_utils.js';
 
 const MAX_CONTENT_LENGTH = 500000; // 50万字
 
@@ -43,8 +43,8 @@ export async function onRequestPost(context) {
     return Response.json({ error: '只能向自己创建的书籍添加章节' }, { status: 403 });
   }
 
-  // demo 用户配额：每本书最多 200 章
-  if (!requireMinRole(auth, 'admin')) {
+  // demo 用户配额：每本书最多 200 章（author 无此限制）
+  if (auth.role === 'demo') {
     const { count } = await env.DB.prepare(
       'SELECT COUNT(*) as count FROM chapters WHERE book_id = ?'
     ).bind(book_id).first();
@@ -102,8 +102,8 @@ export async function onRequestPost(context) {
   await env.DB.prepare("UPDATE books SET updated_at = datetime('now') WHERE id = ?")
     .bind(book_id).run();
 
-  // demo章节配额二次检查（防TOCTOU竞态绕过）
-  if (!requireMinRole(auth, 'admin')) {
+  // demo章节配额二次检查（防TOCTOU竞态绕过；author 无此限制）
+  if (auth.role === 'demo') {
     const { count } = await env.DB.prepare(
       'SELECT COUNT(*) as count FROM chapters WHERE book_id = ?'
     ).bind(book_id).first();

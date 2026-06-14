@@ -15,6 +15,9 @@ export async function onRequestGet(context) {
   
   if (auth.role === 'admin') {
     permFilter = "AND u.role != 'super_admin'";
+  } else if (auth.role === 'author') {
+    permFilter = "AND (a.user_id = ? OR (b.created_by = ? AND (u.role IS NULL OR u.role != 'super_admin')))";
+    binds.push(auth.userId, auth.userId);
   } else if (auth.role === 'demo') {
     permFilter = 'AND (a.user_id = ? OR (b.created_by = ? AND u.role = ?))';
     binds.push(auth.userId, auth.userId, 'demo');

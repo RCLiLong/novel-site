@@ -29,10 +29,14 @@ export async function onRequestGet(context) {
   }
 
   // 权限过滤
-  if (auth.role === 'demo') {
-    // demo 只能看自己书上的举报
+  if (auth.role === 'demo' || auth.role === 'author') {
+    // demo / author 只能看自己书上的举报
     where.push('b.created_by = ?');
     binds.push(auth.userId);
+    // author 额外排除超管发表的批注（与 admin 一致）
+    if (auth.role === 'author') {
+      where.push("(anno_user.role IS NULL OR anno_user.role != 'super_admin')");
+    }
   } else if (auth.role === 'admin') {
     // admin 看所有（超管批注的举报除外）
     where.push("anno_user.role != 'super_admin'");
@@ -75,9 +79,9 @@ export async function onRequestGet(context) {
   `;
   const listResult = await env.DB.prepare(listSql).bind(...binds, limit, offset).all();
 
-  // demo 用户隐藏举报人信息（防报复）
+  // demo / author 用户隐藏举报人信息（防报复）
   let reports = listResult.results;
-  if (auth.role === 'demo') {
+  if (auth.role === 'demo' || auth.role === 'author') {
     reports = reports.map(r => ({ ...r, reporter_username: '匿名', reporter_id: null }));
   }
 

@@ -1,5 +1,5 @@
 // POST /api/admin/books — 创建新书籍
-import { checkAdmin, parseJsonBody, requireMinRole } from '../_utils.js';
+import { checkAdmin, parseJsonBody } from '../_utils.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -11,8 +11,8 @@ export async function onRequestPost(context) {
     return Response.json({ error: msg }, { status });
   }
 
-  // demo 用户配额：最多 10 本书
-  if (!requireMinRole(auth, 'admin')) {
+  // demo 用户配额：最多 10 本书（author 无此限制）
+  if (auth.role === 'demo') {
     const { count } = await env.DB.prepare(
       'SELECT COUNT(*) as count FROM books WHERE created_by = ?'
     ).bind(auth.userId).first();
@@ -41,7 +41,7 @@ export async function onRequestPost(context) {
   ).run();
 
   // demo配额二次检查（防TOCTOU竞态绕过）
-  if (!requireMinRole(auth, 'admin')) {
+  if (auth.role === 'demo') {
     const { count } = await env.DB.prepare(
       'SELECT COUNT(*) as count FROM books WHERE created_by = ?'
     ).bind(auth.userId).first();

@@ -35,6 +35,13 @@ export async function onRequestPut(context) {
     if (!canOperate) {
       return Response.json({ error: '无权操作此批注' }, { status: 403 });
     }
+  } else if (auth.role === 'author') {
+    // author 可操作：自己的批注 + 自己书上的非超管批注
+    const canOperate = anno.user_id === auth.userId ||
+      (anno.book_owner === auth.userId && anno.user_role !== 'super_admin');
+    if (!canOperate) {
+      return Response.json({ error: '无权操作此批注' }, { status: 403 });
+    }
   } else if (auth.role === 'admin') {
     // admin 不能操作超管的批注
     if (anno.user_role === 'super_admin') {

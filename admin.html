@@ -439,6 +439,7 @@
             <label style="font-size:12px;color:var(--text-light)">角色：</label>
             <select id="new-admin-role" style="padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:13px">
               <option value="demo">演示管理员</option>
+              <option value="author">作者</option>
               <option value="admin">管理员</option>
               <option value="super_admin">超级管理员</option>
             </select>
@@ -449,6 +450,33 @@
             </label>
           </div>
           <div id="admin-user-msg"></div>
+        </details>
+      </div>
+
+      <!-- 作者管理（管理员及超管可见） -->
+      <div class="admin-section admin-or-above-only" style="display:none">
+        <h3>✍️ 作者管理</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">作者只能管理自己创建的书籍与章节，且无演示账号的数量限制。</p>
+        <div id="authors-list" style="margin-bottom:12px"></div>
+        <details style="margin-top:8px">
+          <summary style="cursor:pointer;font-size:14px;color:var(--accent)">+ 添加作者</summary>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:8px;align-items:end">
+            <div>
+              <label style="font-size:12px;color:var(--text-light)">用户名</label>
+              <input type="text" id="new-author-user" placeholder="字母数字下划线" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-light)">密码</label>
+              <input type="password" id="new-author-pass" placeholder="至少8位" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+            </div>
+            <button class="btn" onclick="createAuthor()">创建</button>
+          </div>
+          <div style="margin-top:4px">
+            <label style="font-size:12px;color:var(--text-light)">
+              <input type="checkbox" id="new-author-pwd-lock"> 禁止修改密码
+            </label>
+          </div>
+          <div id="author-user-msg"></div>
         </details>
       </div>
 
@@ -582,19 +610,28 @@
       document.getElementById('login-panel').style.display = 'none';
       document.getElementById('admin-panel').style.display = 'block';
       document.getElementById('current-user').textContent = username;
-      document.getElementById('user-info').textContent = username + (role === 'super_admin' ? ' (超管)' : role === 'admin' ? ' (管理)' : ' (演示)');
+      const roleLabel = role === 'super_admin' ? ' (超管)'
+        : role === 'admin' ? ' (管理)'
+        : role === 'author' ? ' (作者)'
+        : ' (演示)';
+      document.getElementById('user-info').textContent = username + roleLabel;
       document.getElementById('user-info').style.display = 'inline';
-      // 密码锁定或demo角色：隐藏修改密码链接
+      // 密码锁定或 demo 角色：隐藏修改密码链接（author/admin/super_admin 可以改密码）
       const pwdLink = document.querySelector('a[onclick*="showChangePassword"]');
       if (pwdLink) pwdLink.style.display = (currentPasswordLocked || role === 'demo') ? 'none' : '';
-      // super_admin专属功能
+      // super_admin 专属功能
       const saEls = document.querySelectorAll('.super-admin-only');
       saEls.forEach(el => el.style.display = role === 'super_admin' ? '' : 'none');
-      // demo用户显示注销按钮
+      // admin / super_admin 专属功能
+      const adminEls = document.querySelectorAll('.admin-or-above-only');
+      const isAdminOrAbove = role === 'super_admin' || role === 'admin';
+      adminEls.forEach(el => el.style.display = isAdminOrAbove ? '' : 'none');
+      // demo / author 用户显示注销按钮
       const deactivateBtn = document.getElementById('deactivate-account-btn');
-      if (deactivateBtn) deactivateBtn.style.display = role === 'demo' ? '' : 'none';
+      if (deactivateBtn) deactivateBtn.style.display = (role === 'demo' || role === 'author') ? '' : 'none';
       refreshAllBooks(); loadSettings(); loadStats(); loadFontList();
       if (role === 'super_admin') { loadAdminUsers(); loadGitHubConfig(); }
+      if (isAdminOrAbove) { loadAuthors(); }
     }
 
     async function doLogout() {
@@ -951,8 +988,9 @@
           el.innerHTML='<li style="padding:12px 0;color:var(--text-light)">暂无书籍</li>'; _booksCache=[]; return;
         }
         _booksCache = data.books;
+        const isLimitedRole = currentRole === 'demo' || currentRole === 'author';
         el.innerHTML=data.books.map(b=>{
-          const isOwner = currentRole !== 'demo' || b.created_by === currentUserId;
+          const isOwner = !isLimitedRole || b.created_by === currentUserId;
           const status = b.status || 'normal';
           const isDeleted = status === 'deleted';
           const isUnlisted = status === 'unlisted';
@@ -985,7 +1023,7 @@
           return `
           <li data-id="${b.id}"${dimmed ? ' style="opacity:0.65"' : ''}>
             <div class="item-info">
-              <div class="item-title">${esc(b.title)}${statusBadge}${currentRole === 'demo' && !isOwner ? ' <span style="font-size:11px;color:var(--text-light)">(他人)</span>' : ''}</div>
+              <div class="item-title">${esc(b.title)}${statusBadge}${isLimitedRole && !isOwner ? ' <span style="font-size:11px;color:var(--text-light)">(他人)</span>' : ''}</div>
               <div class="item-meta">${b.author?esc(b.author)+' · ':''}${b.chapter_count} 章 · ${b.total_words} 字</div>
             </div>
             <div class="item-actions">${actions}</div>
@@ -1054,8 +1092,9 @@
     function renderBookSelects(data) {
       try {
         const allBooks = data.books || [];
-        // demo用户只能在添加章节/章节管理/导入中选自己的书
-        const myBooks = currentRole === 'demo' ? allBooks.filter(b => b.created_by === currentUserId) : allBooks;
+        // demo / author 用户只能在添加章节/章节管理/导入中选自己的书
+        const isLimitedRole = currentRole === 'demo' || currentRole === 'author';
+        const myBooks = isLimitedRole ? allBooks.filter(b => b.created_by === currentUserId) : allBooks;
         const opts = myBooks.length === 0
           ? '<option value="">请先创建一本书</option>'
           : myBooks.map(b => `<option value="${b.id}">${esc(b.title)}</option>`).join('');
@@ -1377,7 +1416,7 @@
             const ghInfo = isGH ? `<span title="GitHub: ${esc(a.github_login || '')}">${a.avatar_url ? '<img src="'+esc(a.avatar_url)+'" style="width:16px;height:16px;border-radius:50%;vertical-align:middle;margin-right:3px">' : ''}🐙 ${esc(a.github_login || '')}</span>` : '<span style="color:var(--text-light)">本地</span>';
             const bookCount = a.book_count || 0;
             const bookInfo = bookCount > 0 ? `<span style="cursor:pointer;color:var(--primary)" class="btn-view-user-books" title="查看书籍">${bookCount} 本</span>` : '<span style="color:var(--text-light)">0</span>';
-            return `<tr data-id="${a.id}" data-name="${esc(a.username)}" data-lock="${a.password_locked ? 1 : 0}" style="border-bottom:1px solid var(--border)"><td style="padding:6px">${esc(a.username)}</td><td style="padding:6px"><select class="admin-role-select" data-id="${a.id}" style="padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:13px"><option value="super_admin"${a.role==='super_admin'?' selected':''}>超级管理员</option><option value="admin"${a.role==='admin'?' selected':''}>管理员</option><option value="demo"${a.role==='demo'?' selected':''}>演示</option></select></td><td style="padding:6px;font-size:12px">${ghInfo}</td><td style="padding:6px;font-size:13px">${bookInfo}</td><td style="padding:6px"><span title="${a.password_locked ? '密码已锁定' : '密码可修改'}">${a.password_locked ? '🔒' : '🔓'}</span> <button class="btn btn-sm btn-toggle-pwd-lock" data-action="toggle-pwd-lock" style="font-size:11px;padding:1px 6px">${a.password_locked ? '解锁' : '锁定'}</button></td><td style="padding:6px;color:var(--text-light);font-size:12px">${a.created_at ? a.created_at.slice(0,10) : '-'}</td><td style="padding:6px;text-align:right"><button class="btn btn-sm btn-danger btn-delete-admin" data-action="delete-admin">删除</button></td></tr>`;
+            return `<tr data-id="${a.id}" data-name="${esc(a.username)}" data-lock="${a.password_locked ? 1 : 0}" style="border-bottom:1px solid var(--border)"><td style="padding:6px">${esc(a.username)}</td><td style="padding:6px"><select class="admin-role-select" data-id="${a.id}" style="padding:2px 4px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:13px"><option value="super_admin"${a.role==='super_admin'?' selected':''}>超级管理员</option><option value="admin"${a.role==='admin'?' selected':''}>管理员</option><option value="author"${a.role==='author'?' selected':''}>作者</option><option value="demo"${a.role==='demo'?' selected':''}>演示</option></select></td><td style="padding:6px;font-size:12px">${ghInfo}</td><td style="padding:6px;font-size:13px">${bookInfo}</td><td style="padding:6px"><span title="${a.password_locked ? '密码已锁定' : '密码可修改'}">${a.password_locked ? '🔒' : '🔓'}</span> <button class="btn btn-sm btn-toggle-pwd-lock" data-action="toggle-pwd-lock" style="font-size:11px;padding:1px 6px">${a.password_locked ? '解锁' : '锁定'}</button></td><td style="padding:6px;color:var(--text-light);font-size:12px">${a.created_at ? a.created_at.slice(0,10) : '-'}</td><td style="padding:6px;text-align:right"><button class="btn btn-sm btn-danger btn-delete-admin" data-action="delete-admin">删除</button></td></tr>`;
           }).join('') +
           '</tbody></table>';
       } catch {}
@@ -1418,9 +1457,10 @@
         showMsg('admin-user-msg', data.message, 'success');
         document.getElementById('new-admin-user').value = '';
         document.getElementById('new-admin-pass').value = '';
-        document.getElementById('new-admin-super').checked = false;
         document.getElementById('new-admin-pwd-lock').checked = false;
         loadAdminUsers();
+        // 若新建的是作者角色，刷新作者列表
+        if (role === 'author' && typeof loadAuthors === 'function') loadAuthors();
       } catch(e) { showMsg('admin-user-msg', e.message, 'error'); }
     }
 
@@ -1465,6 +1505,124 @@
         if (!res.ok) throw new Error(data.error);
         loadAdminUsers();
       } catch(e) { alert(e.message); loadAdminUsers(); }
+    }
+
+    // ===== 作者管理 =====
+    let _authorsCache = [];
+    async function loadAuthors() {
+      const el = document.getElementById('authors-list');
+      if (!el) return;
+      try {
+        const res = await api('GET', '/api/admin/authors');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        const authors = data.authors || [];
+        _authorsCache = authors;
+        if (authors.length === 0) {
+          el.innerHTML = '<p style="color:var(--text-light);font-size:13px">暂无作者，可在下方添加</p>';
+          return;
+        }
+        const canReset = currentRole === 'super_admin';
+        el.innerHTML = '<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:6px">用户名</th><th style="text-align:left;padding:6px">书籍</th><th style="text-align:left;padding:6px">字数</th><th style="text-align:left;padding:6px">密码</th><th style="text-align:left;padding:6px">创建时间</th><th style="text-align:right;padding:6px">操作</th></tr></thead><tbody>' +
+          authors.map(a => {
+            const bookCount = a.book_count || 0;
+            const totalWords = a.total_words || 0;
+            const wordsText = totalWords >= 10000 ? (totalWords / 10000).toFixed(1) + ' 万' : totalWords.toLocaleString();
+            const bookInfo = bookCount > 0
+              ? `<span style="cursor:pointer;color:var(--accent)" class="btn-view-author-books" title="查看书籍">${bookCount} 本</span>`
+              : '<span style="color:var(--text-light)">0</span>';
+            const resetBtn = canReset
+              ? ' <button class="btn btn-sm btn-reset-author-pwd" style="font-size:11px;padding:1px 6px">重置密码</button>'
+              : '';
+            return `<tr data-id="${a.id}" data-name="${esc(a.username)}" data-lock="${a.password_locked ? 1 : 0}" style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px">${esc(a.username)}</td>
+              <td style="padding:6px;font-size:13px">${bookInfo}</td>
+              <td style="padding:6px;font-size:13px;color:var(--text-light)">${wordsText}</td>
+              <td style="padding:6px">
+                <span title="${a.password_locked ? '密码已锁定' : '密码可修改'}">${a.password_locked ? '🔒' : '🔓'}</span>
+                <button class="btn btn-sm btn-toggle-author-pwd-lock" style="font-size:11px;padding:1px 6px">${a.password_locked ? '解锁' : '锁定'}</button>
+              </td>
+              <td style="padding:6px;color:var(--text-light);font-size:12px">${a.created_at ? a.created_at.slice(0,10) : '-'}</td>
+              <td style="padding:6px;text-align:right">${resetBtn}<button class="btn btn-sm btn-danger btn-delete-author" style="margin-left:4px">删除</button></td>
+            </tr>`;
+          }).join('') +
+          '</tbody></table>';
+      } catch(e) {
+        el.innerHTML = `<p style="color:var(--danger,#e74c3c);font-size:13px">加载失败：${esc(e.message)}</p>`;
+      }
+    }
+
+    // 作者列表事件委托
+    document.getElementById('authors-list').addEventListener('click', function(e) {
+      const tr = e.target.closest('tr[data-id]');
+      if (!tr) return;
+      const id = Number(tr.dataset.id);
+      const name = tr.dataset.name;
+      const lock = Number(tr.dataset.lock);
+      if (e.target.classList.contains('btn-toggle-author-pwd-lock')) {
+        toggleAuthorPwdLock(id, lock ? 0 : 1);
+      } else if (e.target.classList.contains('btn-delete-author')) {
+        deleteAuthor(id, name);
+      } else if (e.target.classList.contains('btn-reset-author-pwd')) {
+        resetAuthorPwd(id, name);
+      } else if (e.target.classList.contains('btn-view-author-books')) {
+        showUserBooks(id, name);
+      }
+    });
+
+    async function createAuthor() {
+      const username = document.getElementById('new-author-user').value.trim();
+      const password = document.getElementById('new-author-pass').value;
+      const pwdLock = document.getElementById('new-author-pwd-lock').checked;
+      if (!username || !password) return showMsg('author-user-msg', '请填写用户名和密码', 'error');
+      try {
+        const res = await api('POST', '/api/admin/authors', { username, password, password_locked: pwdLock ? 1 : 0 });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('author-user-msg', data.message, 'success');
+        document.getElementById('new-author-user').value = '';
+        document.getElementById('new-author-pass').value = '';
+        document.getElementById('new-author-pwd-lock').checked = false;
+        loadAuthors();
+        // 同时刷新管理员列表（如果在显示）
+        if (currentRole === 'super_admin') loadAdminUsers();
+      } catch(e) { showMsg('author-user-msg', e.message, 'error'); }
+    }
+
+    async function deleteAuthor(id, username) {
+      if (!confirm(`确定删除作者 ${username}？\n\n该作者创建的书籍将转交给超级管理员保管。`)) return;
+      try {
+        const res = await api('DELETE', '/api/admin/authors', { id });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        loadAuthors();
+        refreshAllBooks();
+        if (currentRole === 'super_admin') loadAdminUsers();
+      } catch(e) { alert(e.message); }
+    }
+
+    async function toggleAuthorPwdLock(id, newValue) {
+      try {
+        const res = await api('PUT', '/api/admin/authors', { id, password_locked: newValue });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        loadAuthors();
+      } catch(e) { alert(e.message); loadAuthors(); }
+    }
+
+    async function resetAuthorPwd(id, username) {
+      const pwd = prompt(`为作者「${username}」设置新密码（至少8位，需包含字母和数字）：`);
+      if (!pwd) return;
+      if (pwd.length < 8 || !/[a-zA-Z]/.test(pwd) || !/\d/.test(pwd)) {
+        alert('密码不合法：至少8位，且需包含字母和数字');
+        return;
+      }
+      try {
+        const res = await api('PUT', '/api/admin/authors', { id, new_password: pwd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        alert(`已重置 ${username} 的密码，该作者需重新登录`);
+      } catch(e) { alert(e.message); }
     }
 
     // ===== 批量操作 =====
@@ -1667,7 +1825,8 @@
         const data = await res.json();
         const sel = document.getElementById('epub-book-select');
         const allBooks = data.books || [];
-        const myBooks = currentRole === 'demo' ? allBooks.filter(b => b.created_by === currentUserId) : allBooks;
+        const isLimitedRole = currentRole === 'demo' || currentRole === 'author';
+        const myBooks = isLimitedRole ? allBooks.filter(b => b.created_by === currentUserId) : allBooks;
         if (myBooks.length === 0) {
           sel.innerHTML = '<option value="">请先创建一本书</option>';
         } else {
@@ -1945,8 +2104,9 @@
       if (parent) parent.style.display = '';
       container.innerHTML = _allTags.map(t => {
         const checked = selectedIds.includes(t.id);
+        const canManageGlobalTags = currentRole !== 'demo' && currentRole !== 'author';
         return `<label data-tag-id="${t.id}" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:4px 10px;border:1px solid ${checked ? t.color : 'var(--border)'};border-radius:12px;font-size:13px;background:${checked ? t.color + '22' : 'transparent'};color:${checked ? t.color : 'var(--text-light)'};transition:all .15s;user-select:none">
-          ${esc(t.name)}${currentRole !== 'demo' ? `<span class="tag-delete-x" data-tag-id="${t.id}" style="margin-left:2px;font-size:11px;opacity:0.5;cursor:pointer" title="删除标签">✕</span>` : ''}
+          ${esc(t.name)}${canManageGlobalTags ? `<span class="tag-delete-x" data-tag-id="${t.id}" style="margin-left:2px;font-size:11px;opacity:0.5;cursor:pointer" title="删除标签">✕</span>` : ''}
         </label>`;
       }).join('');
       // 点击切换选中
@@ -2042,9 +2202,9 @@
         else _editBookTags.push(tagId);
         renderEditBookTags();
       });
-      // demo用户隐藏内联创建标签
+      // demo / author 用户隐藏内联创建标签（仅 admin+ 可管理全局标签）
       const actions = document.getElementById('edit-tag-actions');
-      if (actions) actions.style.display = currentRole === 'demo' ? 'none' : '';
+      if (actions) actions.style.display = (currentRole === 'demo' || currentRole === 'author') ? 'none' : '';
     }
 
     // 内联创建标签（编辑弹窗内）

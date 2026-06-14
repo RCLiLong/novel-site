@@ -49,6 +49,15 @@ export async function onRequestPost(context) {
       LEFT JOIN admin_users u2 ON a2.user_id = u2.id
       WHERE u2.role != 'super_admin' OR u2.role IS NULL
     )`;
+  } else if (auth.role === 'author') {
+    // author 可操作：自己的批注 + 自己书上的非超管批注
+    permFilter = `AND a.id IN (
+      SELECT a2.id FROM annotations a2
+      LEFT JOIN admin_users u2 ON a2.user_id = u2.id
+      LEFT JOIN books b2 ON a2.book_id = b2.id
+      WHERE a2.user_id = ? OR (b2.created_by = ? AND (u2.role IS NULL OR u2.role != 'super_admin'))
+    )`;
+    permBinds.push(auth.userId, auth.userId);
   } else if (auth.role === 'demo') {
     // demo 只能操作自己的批注或自己书上的 demo 批注
     permFilter = `AND a.id IN (

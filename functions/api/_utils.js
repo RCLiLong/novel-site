@@ -385,8 +385,9 @@ async function clearFailedAttempts(env, ip) {
 // ===== 工具函数 =====
 export function validateId(id) { return /^\d{1,18}$/.test(id) && Number(id) > 0; }
 
-// 角色层级：super_admin > admin > demo（editor是admin的旧名，兼容）
-const ROLE_LEVEL = { super_admin: 3, admin: 2, editor: 2, demo: 1 };
+// 角色层级：super_admin > admin > author > demo（editor是admin的旧名，兼容）
+// author：作者角色，仅能管理自己创建的书籍/章节，但无 demo 配额限制
+const ROLE_LEVEL = { super_admin: 4, admin: 3, editor: 3, author: 2, demo: 1 };
 
 export function requireSuperAdmin(auth) {
   return auth.role === 'super_admin';
@@ -397,11 +398,11 @@ export function requireMinRole(auth, minRole) {
   return (ROLE_LEVEL[auth.role] || 0) >= (ROLE_LEVEL[minRole] || 99);
 }
 
-// demo角色的书籍所有权检查：返回true表示允许操作
+// demo/author 角色的书籍所有权检查：返回true表示允许操作
 export async function checkBookOwnership(auth, env, bookId) {
   // admin及以上不受限
   if (requireMinRole(auth, 'admin')) return true;
-  // demo只能操作自己创建的书
+  // author / demo 只能操作自己创建的书
   const book = await env.DB.prepare('SELECT created_by FROM books WHERE id = ?').bind(bookId).first();
   if (!book) return false; // 书不存在
   return book.created_by === auth.userId;

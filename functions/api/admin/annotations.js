@@ -20,6 +20,10 @@ function buildPermissionFilter(auth) {
   } else if (auth.role === 'admin') {
     // 排除超管的批注
     where.push("u.role != 'super_admin'");
+  } else if (auth.role === 'author') {
+    // author：自己的批注 + 自己书上的所有批注（非超管发表的）
+    where.push("(a.user_id = ? OR (b.created_by = ? AND (u.role IS NULL OR u.role != 'super_admin')))");
+    binds.push(auth.userId, auth.userId);
   } else {
     // demo：自己的批注 + 自己书上的 demo 批注
     where.push('(a.user_id = ? OR (b.created_by = ? AND u.role = ?))');
