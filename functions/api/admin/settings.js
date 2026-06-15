@@ -7,7 +7,7 @@
 // POST /api/admin/settings?section=email — 保存 Resend 邮件配置（仅超管）
 import { checkAdmin, requireSuperAdmin, parseJsonBody } from '../_utils.js';
 
-const ALLOWED_KEYS = ['site_name', 'site_desc', 'footer_text'];
+const ALLOWED_KEYS = ['site_name', 'site_desc', 'footer_text', 'download_enabled'];
 const MAX_VALUE_LENGTH = 500;
 // 广告 HTML 允许更长（嵌入广告代码 / iframe）
 const MAX_AD_HTML_LENGTH = 10000;
@@ -31,12 +31,22 @@ export async function onRequestPut(context) {
   const updates = [];
   for (const [key, value] of Object.entries(body.settings)) {
     if (!ALLOWED_KEYS.includes(key)) continue;
-    if (typeof value !== 'string') continue;
-    const trimmed = value.trim().slice(0, MAX_VALUE_LENGTH);
-    updates.push(
-      env.DB.prepare('INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)')
-        .bind(key, trimmed)
-    );
+    // 字符串字段
+    if (typeof value === 'string') {
+      const trimmed = value.trim().slice(0, MAX_VALUE_LENGTH);
+      updates.push(
+        env.DB.prepare('INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)')
+          .bind(key, trimmed)
+      );
+      continue;
+    }
+    // 布尔字段：序列化为 'true' / 'false'
+    if (key === 'download_enabled' && typeof value === 'boolean') {
+      updates.push(
+        env.DB.prepare('INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)')
+          .bind(key, value ? 'true' : 'false')
+      );
+    }
   }
 
   if (updates.length > 0) {

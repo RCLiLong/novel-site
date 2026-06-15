@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>作者要求 - 我的书架</title>
+  <meta name="description" content="欢迎原创作者投稿！本站为零成本、非营利阅读站，作者保留作品全部版权，审核通过即可自主上传章节。">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .authors-page { max-width: 820px; margin: 0 auto; padding: 32px 24px 64px; line-height: 1.85; color: var(--text); }
+    .authors-page .hero { text-align: center; margin-bottom: 40px; }
+    .authors-page h1 { font-size: 30px; margin-bottom: 12px; background: linear-gradient(135deg, var(--accent), var(--accent-dark)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .authors-page .tagline { font-size: 15px; color: var(--text-light); }
+    .authors-page h2 { font-size: 20px; margin: 36px 0 14px; padding: 10px 14px; background: var(--bg); border-left: 4px solid var(--accent); border-radius: 4px; }
+    .authors-page p { margin-bottom: 12px; }
+    .authors-page ul, .authors-page ol { margin: 8px 0 14px 24px; }
+    .authors-page li { margin-bottom: 8px; }
+    .authors-page strong { color: var(--accent-dark); }
+    .authors-page .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin: 20px 0; }
+    .authors-page .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+    .authors-page .card .icon { font-size: 24px; margin-bottom: 8px; }
+    .authors-page .card h3 { font-size: 15px; margin: 0 0 6px; }
+    .authors-page .card p { font-size: 13px; color: var(--text-light); margin: 0; line-height: 1.6; }
+    .authors-page .cta-box { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; padding: 20px 24px; border-radius: var(--radius); margin: 28px 0; text-align: center; }
+    .authors-page .cta-box h3 { margin: 0 0 8px; font-size: 18px; }
+    .authors-page .cta-box p { margin: 0 0 14px; opacity: 0.95; font-size: 14px; }
+    .authors-page .cta-box a { display: inline-block; background: #fff; color: var(--accent-dark); padding: 8px 20px; border-radius: var(--radius); text-decoration: none; font-weight: 600; }
+    .authors-page .cta-box a:hover { transform: translateY(-1px); }
+    .authors-page .flow { background: var(--bg); padding: 18px 22px; border-radius: var(--radius); margin: 16px 0; }
+    .authors-page .flow ol { margin-left: 22px; }
+    .authors-page code { background: var(--bg); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+    .authors-page .footer-note { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-light); text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1><a href="/">📚 我的书架</a></h1>
+    <nav>
+      <a href="/">返回书架</a>
+      <a href="/copyright.html">版权声明</a>
+    </nav>
+  </div>
+  <div class="container">
+    <article class="authors-page">
+      <header class="hero">
+        <h1>✍️ 欢迎原创作者投稿</h1>
+        <p class="tagline">零门槛 · 作品版权归你 · 一键发布</p>
+      </header>
+
+      <div class="cta-box">
+        <h3>立即成为本站作者</h3>
+        <p>免费注册一个作者账号，审核通过即可自主上传章节、管理作品。</p>
+        <a href="/admin.html">前往注册</a>
+      </div>
+
+      <h2>🎯 我们能为你做什么？</h2>
+      <div class="card-grid">
+        <div class="card">
+          <div class="icon">🚀</div>
+          <h3>零成本发布</h3>
+          <p>基于 Cloudflare 免费层，无需购买服务器或域名，写完即可上传到云端。</p>
+        </div>
+        <div class="card">
+          <div class="icon">📚</div>
+          <h3>自主管理作品</h3>
+          <p>支持章节顺序拖动、批量导入 TXT/EPUB、自定义封面、标签分类、上下架等。</p>
+        </div>
+        <div class="card">
+          <div class="icon">🔒</div>
+          <h3>作品版权始终归你</h3>
+          <p>本站仅展示，不主张对作品拥有版权；作者随时可下架、删除，无任何附加条件。</p>
+        </div>
+        <div class="card">
+          <div class="icon">📊</div>
+          <h3>阅读数据可见</h3>
+          <p>查看每本书的累计阅读量、章节热度、读者批注反馈，作品传播情况一目了然。</p>
+        </div>
+        <div class="card">
+          <div class="icon">💬</div>
+          <h3>读者批注互动</h3>
+          <p>读者可对任意章节发表批注（公开/私有），作者可对精彩反馈点赞/置顶。</p>
+        </div>
+        <div class="card">
+          <div class="icon">🛠️</div>
+          <h3>无广告污染</h3>
+          <p>本站为非营利项目，无侵入式弹窗、无恶意跳转、不抓取用户数据。</p>
+        </div>
+      </div>
+
+      <h2>📜 作者权利清单</h2>
+      <p>签署投稿即代表你<strong>保留下列全部权利</strong>：</p>
+      <ul>
+        <li>作品之<strong>全部著作权</strong>仍归原作者本人，本站不主张、不转让、不放弃。</li>
+        <li><strong>随时下架</strong>作品：登录后台 → 书籍列表 → 一键下架或永久删除。</li>
+        <li><strong>随时修改</strong>章节内容、调整章节顺序、修改书名/简介/封面等。</li>
+        <li><strong>随时导出</strong>自己的全部作品（TXT 格式导出由超管开启后方可使用）。</li>
+        <li>本站不会对作品内容进行任何 AI 训练、数据挖掘、第三方授权或商用。</li>
+        <li>如本站关闭、转让或被收购，<strong>作品将一并下架</strong>，原数据不与任何第三方共享。</li>
+      </ul>
+
+      <h2>📝 投稿要求</h2>
+      <ol>
+        <li><strong>原创性</strong>：作品须为原创，或您拥有合法授权的翻译/改编版本；禁止抄袭、洗稿、未授权搬运他人作品。</li>
+        <li><strong>合规性</strong>：内容须符合中华人民共和国法律法规；不得包含色情、暴力、血腥、政治敏感或其他违反公序良俗的内容。</li>
+        <li><strong>完整性</strong>：建议单本作品不少于 5 章、单章不少于 1000 字；强烈建议附带简介与封面图。</li>
+        <li><strong>命名规范</strong>：书名 2-200 字、作者署名 0-100 字、章节标题 1-200 字；不要使用纯特殊符号。</li>
+        <li><strong>格式建议</strong>：上传时支持 TXT 与 EPUB；推荐使用 UTF-8 编码，避免特殊排版字符。</li>
+      </ol>
+
+      <h2>🚀 投稿流程</h2>
+      <div class="flow">
+        <ol>
+          <li>打开 <a href="/admin.html">/admin.html</a>，点击 <strong>"申请成为作者（邮箱注册）"</strong>；</li>
+          <li>填写邮箱，接收 6 位验证码（10 分钟内有效）；</li>
+          <li>设置用户名、密码（≥8 位，含字母与数字）并提交；</li>
+          <li>等待超管审核（通常 24 小时内完成）；</li>
+          <li>审核通过后登录后台，进入"创建书籍"→ 添加章节 → 立即对外展示。</li>
+        </ol>
+      </div>
+
+      <h2>❓ 常见问题</h2>
+      <p><strong>Q：作品会被人复制/盗用吗？</strong></p>
+      <p>本站数据库与 R2 存储均受 Cloudflare 访问控制保护；读者只能在线阅读，无法直接获取原文文件。如管理员开启下载功能，读者可获取 TXT 文本。如您希望进一步保护，<strong>请勿开启下载</strong>，或先在您的内容中增加版权水印声明。</p>
+
+      <p><strong>Q：能上传多少作品？</strong></p>
+      <p>作者角色<strong>无数量限制</strong>，章节数也无单本上限（演示账号则限制为 10 本/200 章）。</p>
+
+      <p><strong>Q：可以上传完结作品吗？</strong></p>
+      <p>完全可以。本站既支持连载、也支持一次性完结上传。</p>
+
+      <p><strong>Q：能挂我的联系方式（QQ/微信/邮箱）吗？</strong></p>
+      <p>可以。在<strong>作者简介</strong>或<strong>章节末</strong>添加即可，作品版权始终归你。</p>
+
+      <p><strong>Q：能从本站迁走作品吗？</strong></p>
+      <p>可以。后台支持一键 TXT 导出全本（需要超管开启下载功能），或联系我们协助迁移。</p>
+
+      <h2>📨 联系方式</h2>
+      <ul>
+        <li>📧 邮箱：见管理后台登录页底部</li>
+        <li>🐙 GitHub：<a href="https://github.com/xingzihai/novel-site/issues" target="_blank" rel="noopener">提交 Issue</a></li>
+        <li>💬 留言：登录后台 → 设置 → 站点说明中可联系超管</li>
+      </ul>
+
+      <div class="footer-note">
+        <p>📌 在你投递稿件前，请确认已阅读并同意 <a href="/copyright.html">《版权声明》</a> 中的条款。</p>
+        <p style="margin-top:16px"><a href="/">← 返回书架</a> · <a href="/copyright.html">版权声明 →</a></p>
+      </div>
+    </article>
+  </div>
+  <script>
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    // 同步站名
+    fetch('/api/settings').then(r => r.json()).then(d => {
+      if (d.settings && d.settings.site_name) {
+        document.querySelector('.navbar h1 a').textContent = '📚 ' + d.settings.site_name;
+        document.title = '作者要求 - ' + d.settings.site_name;
+      }
+      // 检测注册是否启用，禁用则隐藏 CTA
+      fetch('/api/settings?check=register').then(r => r.json()).then(reg => {
+        if (!reg.authorRegistrationEnabled) {
+          const cta = document.querySelector('.cta-box');
+          if (cta) {
+            cta.querySelector('a').textContent = '暂未开放';
+            cta.querySelector('a').style.opacity = '0.6';
+            cta.querySelector('a').style.pointerEvents = 'none';
+            cta.querySelector('p').textContent = '作者邮箱注册暂未开放，请联系管理员开启。';
+          }
+        }
+      }).catch(() => {});
+    }).catch(() => {});
+  </script>
+</body>
+</html>

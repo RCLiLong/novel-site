@@ -1,5 +1,5 @@
 // GET /api/settings — 公开读取站点设置（白名单过滤）
-const PUBLIC_KEYS = ['site_name', 'site_desc', 'footer_text', 'custom_fonts'];
+const PUBLIC_KEYS = ['site_name', 'site_desc', 'footer_text', 'custom_fonts', 'download_enabled'];
 const AD_KEYS = [
   'ad_enabled', 'ad_mode',
   'ad_left_html', 'ad_right_html', 'ad_popup_html',
@@ -54,6 +54,10 @@ export async function onRequestGet(context) {
     if (PUBLIC_KEYS.includes(row.key)) {
       settings[row.key] = row.value;
     }
+  }
+  // 规范化布尔字段
+  if ('download_enabled' in settings) {
+    settings.download_enabled = settings.download_enabled === 'true';
   }
   return Response.json({ settings });
 }

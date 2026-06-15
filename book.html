@@ -27,6 +27,13 @@
     <div class="breadcrumb"><a href="/">书架</a><span>›</span><span id="bc-title">加载中...</span></div>
     <div id="content" class="loading">加载中...</div>
   </div>
+  <footer style="text-align:center;padding:24px 16px;font-size:13px;color:var(--text-light);border-top:1px solid var(--border);margin-top:32px">
+    <span id="footer-text"></span>
+    <span style="margin:0 8px">·</span>
+    <a href="/copyright.html" style="color:var(--text-light);text-decoration:none">版权声明</a>
+    <span style="margin:0 8px">·</span>
+    <a href="/authors.html" style="color:var(--text-light);text-decoration:none">作者要求</a>
+  </footer>
   <script>
     const THEMES = ['light','dark','green','sepia','blue'];
     const THEME_ICONS = {'light':'🌙','dark':'☀️','green':'🍃','sepia':'📜','blue':'💧'};
@@ -59,6 +66,19 @@
     fetch('/api/settings').then(r => r.json()).then(d => {
       const s = d.settings || {};
       if (s.site_name) document.querySelector('.navbar h1 a').textContent = '📚 ' + s.site_name;
+      // 页脚
+      if (s.footer_text) {
+        const el = document.getElementById('footer-text');
+        if (el) el.textContent = s.footer_text;
+      }
+      // 下载功能开关（默认关闭）
+      const downloadOn = s.download_enabled === true;
+      // 监控 DOM 变化以处理动态渲染的导出链接
+      const observer = new MutationObserver(() => {
+        const link = document.getElementById('export-link');
+        if (link) link.style.display = downloadOn ? '' : 'none';
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
     }).catch(() => {});
 
     // PWA Service Worker

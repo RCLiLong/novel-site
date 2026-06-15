@@ -20,6 +20,7 @@
   <div class="navbar">
     <h1><a href="/">📚 我的书架</a></h1>
     <nav>
+      <a href="/authors.html" title="作者要求">作者要求</a>
       <a href="https://github.com/xingzihai/novel-site" target="_blank" rel="noopener" title="GitHub">GitHub</a>
       <a href="/admin.html" id="nav-admin">管理</a>
       <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">🌙</button>
@@ -36,6 +37,13 @@
     <div id="search-results" class="search-results" style="display:none"></div>
     <div id="content" class="loading">加载中...</div>
   </div>
+  <footer style="text-align:center;padding:24px 16px;font-size:13px;color:var(--text-light);border-top:1px solid var(--border);margin-top:32px">
+    <span id="footer-text"></span>
+    <span style="margin:0 8px">·</span>
+    <a href="/copyright.html" style="color:var(--text-light);text-decoration:none">版权声明</a>
+    <span style="margin:0 8px">·</span>
+    <a href="/authors.html" style="color:var(--text-light);text-decoration:none">作者要求</a>
+  </footer>
   <script>
     // 主题
     const THEMES = ['light','dark','green','sepia','blue'];
@@ -331,6 +339,10 @@
       if (s.site_desc) {
         document.querySelector('meta[name="description"]').content = s.site_desc;
         document.querySelector('meta[property="og:description"]').content = s.site_desc;
+      }
+      // 页脚
+      if (s.footer_text) {
+        document.getElementById('footer-text').textContent = s.footer_text;
       }
     }).catch(() => {});
   </script>

@@ -157,6 +157,15 @@
   <!-- 批注：查看弹窗 -->
   <div id="anno-popover" class="anno-popover" style="display:none"></div>
 
+  <!-- 底部信息条（仅在非沉浸模式显示） -->
+  <footer class="reader-footer" id="reader-footer" style="text-align:center;padding:20px 16px;font-size:12px;color:var(--text-light);border-top:1px solid var(--border);margin-top:32px">
+    <span id="reader-footer-text"></span>
+    <span style="margin:0 6px">·</span>
+    <a href="/copyright.html" style="color:var(--text-light);text-decoration:none">版权声明</a>
+    <span style="margin:0 6px">·</span>
+    <a href="/authors.html" style="color:var(--text-light);text-decoration:none">作者要求</a>
+  </footer>
+
   <script>
     // ===== 认证状态 =====
     const authToken = ''; // token由HttpOnly Cookie自动携带
@@ -840,6 +849,17 @@
     fetch('/api/settings').then(r => r.json()).then(d => {
       const s = d.settings || {};
       if (s.site_name) document.querySelector('.navbar h1 a').textContent = '📚 ' + s.site_name;
+      // 页脚
+      if (s.footer_text) {
+        const el = document.getElementById('reader-footer-text');
+        if (el) el.textContent = s.footer_text;
+      }
+      // 下载功能开关（默认关闭）
+      const downloadOn = s.download_enabled === true;
+      ['export-btn', 'download-book-btn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = downloadOn ? '' : 'none';
+      });
     }).catch(() => {});
 
     // ===== 加载自定义字体 =====

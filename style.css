@@ -1503,8 +1503,9 @@ body.immersive .pager-tap-right { bottom: 0; }
   .reader-ad { display: none !important; }
 }
 
-/* 沉浸模式下隐藏广告 */
+/* 沉浸模式下隐藏广告 + 阅读页页脚 */
 body.immersive .reader-ad { display: none !important; }
+body.immersive .reader-footer { display: none !important; }
 
 /* ========== 返回弹窗广告 ========== */
 .ad-popup-overlay {
