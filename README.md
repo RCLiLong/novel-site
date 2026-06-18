@@ -71,6 +71,15 @@
 **内容保护**
 - 🔒 下载功能默认关闭，后台可一键开启（章节 TXT 导出 + 全书缓存）
 - 🛡️ 投稿作者建议保持下载关闭，避免被批量搬运；如开启可配合自定义版权水印
+- 🛡️ 服务端 `/api/books/:id/download` 端点独立校验 `download_enabled`，即使绕过前端 JS 仍返回 403
+
+**读者订阅与积分系统**
+- 👤 独立的 `users` 表（与 `admin_users` 分离），邮箱验证码注册，注册即送 10 积分
+- 💰 积分体系：看一次广告 = 5 积分（每天最多 5 次），充值按需扩展
+- 📖 书籍定价：作者可设置「前 N 章免费 + 后续 X 积分」，未订阅则阅读 API 返回 402 Paywall
+- 🎬 看广告赚积分（前端 5 秒倒计时防脚本绕过）
+- 📊 用户中心：余额、积分流水、已订阅列表
+- 👮 超管可在后台手动充值/扣款、封禁/解封、删除读者账号
 
 **批注系统**
 - 💬 选中文字发表批注（公开/私有），浮动按钮触发
@@ -199,9 +208,10 @@ wrangler pages deploy .
 ```
 novel-site/
 ├── index.html              # 首页（书架 + 阅读统计）
-├── book.html               # 书籍详情（章节列表 + 书签）
-├── read.html               # 阅读页面（滚动/翻页 + 沉浸模式 + 广告）
-├── admin.html              # 管理后台（统计 + EPUB导入 + 用户/作者/广告管理）
+├── book.html               # 书籍详情（章节列表 + 书签 + 订阅按钮）
+├── read.html               # 阅读页面（滚动/翻页 + 沉浸模式 + 广告 + 付费门槛）
+├── user.html               # 读者中心（注册/登录 + 积分余额 + 看广告 + 订阅）
+├── admin.html              # 管理后台（统计 + EPUB导入 + 用户/作者/广告/定价/读者账号管理）
 ├── annotation-admin.html   # 批注管理（批注列表 + 举报管理 + 统计）
 ├── copyright.html          # 版权声明页（公版作品 + 作者投稿，不主张版权）
 ├── authors.html            # 作者要求页（投稿引导、作者权利清单）
@@ -233,10 +243,13 @@ novel-site/
         │   │   └── callback.js # GitHub OAuth 回调
         │   ├── register.js # 作者邮箱注册（发送验证码 + 校验）
         │   └── logout.js  # 登出（清除 Cookie + Session）
+        ├── user/             # 读者用户 API（独立 cookie：user_token）
+        │   ├── auth.js     # 读者注册/登录/登出/我
+        │   └── me.js       # 余额、看广告、订阅、购买解锁
         ├── books/
-        │   └── [id].js     # 书籍详情 + 章节列表 + 标签
+        │   └── [id].js     # 书籍详情 + 章节列表 + 标签 + 定价 + 访问控制
         ├── chapters/
-        │   └── [id].js     # 章节内容（D1 元数据 + R2 正文）
+        │   └── [id].js     # 章节内容（D1 元数据 + R2 正文 + 付费门槛检查）
         ├── covers/
         │   └── [id].js     # 封面图 serve
         ├── fonts/
@@ -255,10 +268,13 @@ novel-site/
             ├── covers.js   # 封面上传（MIME白名单+魔数验证）
             ├── stats.js    # 访问统计
             ├── users.js    # 多管理员管理（仅超管）
+            ├── users-user.js # 读者账号管理（仅超管，积分/封禁/删除）
             ├── authors.js  # 作者管理（admin+ 可创建/审核/删除）
             ├── book-tags.js # 书籍标签关联（含tag存在性验证）
             ├── books/
-            │   └── [id].js # 编辑/删除书籍（含所有权检查）
+            │   ├── [id].js # 编辑/删除书籍（含所有权检查）
+            │   └── [id]/
+            │       └── pricing.js # 书籍定价（free_chapters / price）
             ├── chapters.js # 创建章节（含配额+R2回滚）
             ├── chapters/
             │   ├── [id].js # 编辑/删除章节（乐观锁+R2回滚+批注警告）
@@ -286,7 +302,14 @@ novel-site/
 | `chapters` | 章节元数据（标题、排序、字数、R2路径、version乐观锁） |
 | `admin_users` | 管理员账号（PBKDF2哈希、角色、GitHub/邮箱、status：active/pending/rejected） |
 | `admin_sessions` | 登录会话（token SHA-256哈希，7天过期） |
-| `pending_registrations` | 邮箱注册验证码（10 分钟过期，最多 5 次验证） |
+| `pending_registrations` | 管理员邮箱注册验证码（10 分钟过期，最多 5 次验证） |
+| `users` | 读者账号（独立于 admin_users，含 balance 积分字段） |
+| `user_sessions` | 读者登录会话（与管理员独立的 cookie 名 `user_token`） |
+| `pending_user_registrations` | 读者邮箱注册验证码 |
+| `book_pricing` | 书籍付费定价（free_chapters 免费章节数 + price 后续积分） |
+| `subscriptions` | 读者对书籍的订阅/解锁记录 |
+| `user_balance_log` | 积分流水（充值/扣款/看广告/购买等） |
+| `ad_rewards` | 看广告奖励记录（防刷：每天最多 5 次） |
 | `tags` / `book_tags` | 标签系统 |
 | `site_settings` | 站点配置 + GitHub OAuth + 广告 + Resend 邮件配置 |
 | `auth_attempts` | 登录限流（IP哈希 + 失败计数） |

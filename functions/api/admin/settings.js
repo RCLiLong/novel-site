@@ -111,11 +111,13 @@ export async function onRequestGet(context) {
   // GET /api/admin/settings?section=email
   if (section === 'email') {
     const enabled = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'author_registration_enabled'").first();
+    const userEnabled = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'user_registration_enabled'").first();
     const fromRow = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'resend_from'").first();
     const hasKey = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'resend_api_key'").first();
     const subjectRow = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'resend_subject'").first();
     return Response.json({
       registrationEnabled: enabled?.value === 'true',
+      userRegistrationEnabled: userEnabled?.value === 'true',
       from: fromRow?.value || '',
       hasApiKey: !!hasKey?.value,
       subject: subjectRow?.value || '【小说站】注册验证码',
@@ -222,10 +224,15 @@ export async function onRequestPost(context) {
 
   // POST /api/admin/settings?section=email
   if (section === 'email') {
-    const { registrationEnabled, from, apiKey, subject } = body;
+    const { registrationEnabled, userRegistrationEnabled, from, apiKey, subject } = body;
 
     await env.DB.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('author_registration_enabled', ?)")
       .bind(registrationEnabled ? 'true' : 'false').run();
+
+    if (userRegistrationEnabled !== undefined) {
+      await env.DB.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('user_registration_enabled', ?)")
+        .bind(userRegistrationEnabled ? 'true' : 'false').run();
+    }
 
     if (from !== undefined) {
       const safeFrom = String(from || '').trim().slice(0, 200);

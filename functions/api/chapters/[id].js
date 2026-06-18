@@ -1,8 +1,9 @@
 // GET /api/chapters/:id — 获取章节内容（D1元数据 + R2正文）
-import { validateId } from '../_utils.js';
+// 付费门槛：第 N 章之后需要用户已订阅该书
+import { validateId, checkUserAdmin } from '../_utils.js';
 
 export async function onRequestGet(context) {
-  const { env, params } = context;
+  const { request, env, params } = context;
   const id = params.id;
 
   if (!validateId(id)) {
@@ -23,19 +24,40 @@ export async function onRequestGet(context) {
   }
 
   // 下架或待删除的书籍不可阅读
-  // 下架或待删除的书籍不可阅读
   if (chapter.book_status && chapter.book_status !== 'normal') {
     return Response.json({ error: '该书籍已下架' }, { status: 403 });
   }
   // 🟢-1: 不暴露内部字段
   delete chapter.book_status;
 
-  // 从R2读取正文内容（需要单独查content_key）
+  // ===== 付费门槛检测 =====
+  // 读取书籍定价（前 N 章免费 + 价格）
+  const pricing = await env.DB.prepare('SELECT free_chapters, price FROM book_pricing WHERE book_id = ?')
+    .bind(chapter.book_id).first();
+  const freeChapters = pricing?.free_chapters ?? 0;
+  const price = pricing?.price ?? 0;
+
+  let needPaywall = false;
+  if (price > 0 && chapter.sort_order > freeChapters) {
+    // 当前用户是否已订阅？
+    const userAuth = await checkUserAdmin(request, env);
+    if (!userAuth.ok) {
+      needPaywall = true;
+    } else {
+      const sub = await env.DB.prepare('SELECT id FROM subscriptions WHERE user_id = ? AND book_id = ?')
+        .bind(userAuth.userId, chapter.book_id).first();
+      if (!sub) needPaywall = true;
+    }
+  }
+
   let content = '';
-  const chapterFull = await env.DB.prepare('SELECT content_key FROM chapters WHERE id = ?').bind(id).first();
-  if (chapterFull && chapterFull.content_key && chapterFull.content_key !== 'pending') {
-    const r2Object = await env.R2.get(chapterFull.content_key);
-    if (r2Object) content = await r2Object.text();
+  if (!needPaywall) {
+    // 从R2读取正文内容
+    const chapterFull = await env.DB.prepare('SELECT content_key FROM chapters WHERE id = ?').bind(id).first();
+    if (chapterFull && chapterFull.content_key && chapterFull.content_key !== 'pending') {
+      const r2Object = await env.R2.get(chapterFull.content_key);
+      if (r2Object) content = await r2Object.text();
+    }
   }
 
   // 查询上一章和下一章
@@ -51,11 +73,25 @@ export async function onRequestGet(context) {
     ORDER BY sort_order ASC LIMIT 1
   `).bind(chapter.book_id, chapter.sort_order).first();
 
+  if (needPaywall) {
+    return Response.json({
+      chapter,
+      content: '',
+      prevChapter: prevChapter || null,
+      nextChapter: nextChapter || null,
+      paywall: {
+        price,
+        freeChapters,
+        unlockHint: '本章为付费章节，请登录并购买订阅后阅读',
+      }
+    }, { status: 402 });
+  }
+
   const response = Response.json({
     chapter,
     content,
     prevChapter: prevChapter || null,
-    nextChapter: nextChapter || null
+    nextChapter: nextChapter || null,
   });
 
   // 异步记录阅读统计（不阻塞响应）

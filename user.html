@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>读者中心 - 我的书架</title>
+  <meta name="description" content="读者中心：注册/登录、积分余额、查看广告赚积分、订阅付费章节">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .user-page { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+    .user-page h1 { font-size: 24px; margin-bottom: 8px; }
+    .user-page .section { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+    .user-page .section h2 { font-size: 16px; margin: 0 0 12px; color: var(--accent-dark); }
+    .user-page .form-group { margin-bottom: 12px; }
+    .user-page .form-group label { display: block; font-size: 13px; color: var(--text-light); margin-bottom: 4px; }
+    .user-page .form-group input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 14px; }
+    .user-page .form-group .help { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .user-page .balance-card { background: linear-gradient(135deg, var(--accent), var(--accent-dark)); color: #fff; padding: 24px; border-radius: var(--radius); margin-bottom: 16px; text-align: center; }
+    .user-page .balance-card .label { font-size: 13px; opacity: 0.9; }
+    .user-page .balance-card .value { font-size: 36px; font-weight: 700; margin: 6px 0; }
+    .user-page .balance-card .sub { font-size: 12px; opacity: 0.85; }
+    .user-page .row { display: flex; gap: 8px; align-items: center; }
+    .user-page .row > * { flex: 1; }
+    .user-page .row .btn { width: 100%; }
+    .user-page .msg { margin-top: 8px; font-size: 13px; min-height: 20px; }
+    .user-page .msg.error { color: var(--color-error, #e74c3c); }
+    .user-page .msg.success { color: var(--color-success, #27ae60); }
+    .user-page .ad-reward { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg); border-radius: var(--radius); margin-top: 12px; }
+    .user-page .ad-reward .icon { font-size: 28px; }
+    .user-page .ad-reward .info { flex: 1; }
+    .user-page .ad-reward .info h3 { font-size: 14px; margin: 0 0 4px; }
+    .user-page .ad-reward .info p { font-size: 12px; color: var(--text-light); margin: 0; }
+    .user-page table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .user-page table th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-light); font-weight: 600; }
+    .user-page table td { padding: 8px; border-bottom: 1px solid var(--border); }
+    .user-page .empty { text-align: center; color: var(--text-light); padding: 24px; font-size: 14px; }
+    .user-page .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .user-page .tab { padding: 8px 14px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--text-light); }
+    .user-page .tab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .user-page .code-input { display: flex; gap: 8px; }
+    .user-page .code-input input { flex: 1; }
+    .user-page .code-input button { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <h1><a href="/">📚 我的书架</a></h1>
+    <nav>
+      <a href="/">返回书架</a>
+      <a href="/authors.html">作者要求</a>
+      <span id="nav-user-info" style="font-size:13px"></span>
+      <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">🌙</button>
+    </nav>
+  </div>
+  <div class="container">
+    <div class="user-page">
+      <h1 id="page-title">👤 读者中心</h1>
+
+      <!-- 未登录：显示登录/注册 -->
+      <div id="auth-area">
+        <div class="tabs">
+          <div class="tab active" data-tab="login">登录</div>
+          <div class="tab" data-tab="register">注册</div>
+        </div>
+
+        <!-- 登录面板 -->
+        <div id="panel-login" class="section">
+          <div class="form-group">
+            <label>用户名 / 邮箱</label>
+            <input type="text" id="login-user" placeholder="用户名或注册邮箱">
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="login-pass" placeholder="密码" onkeydown="if(event.key==='Enter')doUserLogin()">
+          </div>
+          <button class="btn" onclick="doUserLogin()" style="width:100%">登录</button>
+          <div id="login-msg" class="msg"></div>
+        </div>
+
+        <!-- 注册面板 -->
+        <div id="panel-register" class="section" style="display:none">
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">使用邮箱注册，注册即送 <strong>10 积分</strong>，可订阅付费章节或看广告赚更多积分。</p>
+          <div class="form-group">
+            <label>邮箱</label>
+            <div class="code-input">
+              <input type="email" id="reg-email" placeholder="your@email.com" maxlength="200">
+              <button class="btn" id="send-code-btn" onclick="sendCode()">发送验证码</button>
+            </div>
+            <div class="help">收不到？请检查垃圾邮件箱</div>
+          </div>
+          <div class="form-group">
+            <label>验证码</label>
+            <input type="text" id="reg-code" placeholder="6 位数字" maxlength="6" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="reg-username" placeholder="字母数字下划线，2-32 位" maxlength="32">
+          </div>
+          <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="reg-pass" placeholder="至少 8 位，包含字母和数字" maxlength="128">
+          </div>
+          <button class="btn" onclick="doRegister()" style="width:100%">提交注册</button>
+          <div id="reg-msg" class="msg"></div>
+        </div>
+      </div>
+
+      <!-- 已登录：显示中心 -->
+      <div id="user-area" style="display:none">
+        <div class="balance-card">
+          <div class="label">积分余额</div>
+          <div class="value" id="balance-value">--</div>
+          <div class="sub" id="balance-sub">登录中...</div>
+        </div>
+
+        <div class="section">
+          <h2>📺 看广告赚积分</h2>
+          <p style="font-size:13px;color:var(--text-light);margin:0 0 8px">每看完一次广告可获得 <strong>5 积分</strong>，每天最多 5 次。</p>
+          <div class="ad-reward">
+            <div class="icon">🎬</div>
+            <div class="info">
+              <h3>广告奖励</h3>
+              <p id="ad-remaining">今日剩余：-- 次</p>
+            </div>
+            <button class="btn" id="watch-ad-btn">看广告得积分</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>💰 充值积分</h2>
+          <p style="font-size:13px;color:var(--text-light);margin:0 0 8px">当前未接入在线支付，请联系管理员充值或通过看广告赚取积分。</p>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            <div class="section" style="text-align:center;cursor:not-allowed;opacity:0.6">
+              <div style="font-size:20px;font-weight:600">100 积分</div>
+              <div style="font-size:12px;color:var(--text-light)">联系管理员</div>
+            </div>
+            <div class="section" style="text-align:center;cursor:not-allowed;opacity:0.6">
+              <div style="font-size:20px;font-weight:600">500 积分</div>
+              <div style="font-size:12px;color:var(--text-light)">联系管理员</div>
+            </div>
+            <div class="section" style="text-align:center;cursor:not-allowed;opacity:0.6">
+              <div style="font-size:20px;font-weight:600">1000 积分</div>
+              <div style="font-size:12px;color:var(--text-light)">联系管理员</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>📚 已订阅</h2>
+          <div id="subs-list"></div>
+        </div>
+
+        <div class="section">
+          <h2>📊 积分流水</h2>
+          <div id="balance-log"></div>
+        </div>
+
+        <div style="text-align:center;margin-top:16px">
+          <button class="btn" onclick="doUserLogout()">退出登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="text-align:center;padding:24px 16px;font-size:13px;color:var(--text-light);border-top:1px solid var(--border);margin-top:32px">
+    <span id="footer-text"></span>
+    <span style="margin:0 8px">·</span>
+    <a href="/copyright.html" style="color:var(--text-light);text-decoration:none">版权声明</a>
+    <span style="margin:0 8px">·</span>
+    <a href="/authors.html" style="color:var(--text-light);text-decoration:none">作者要求</a>
+  </footer>
+
+  <script>
+    const THEMES = ['light','dark','green','sepia','blue'];
+    const THEME_ICONS = {'light':'🌙','dark':'☀️','green':'🍃','sepia':'📜','blue':'💧'};
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.querySelector('.theme-toggle').textContent = THEME_ICONS[savedTheme] || '🌙';
+    function toggleTheme() {
+      const c = document.documentElement.getAttribute('data-theme');
+      const i = THEMES.indexOf(c);
+      const n = THEMES[(i + 1) % THEMES.length];
+      document.documentElement.setAttribute('data-theme', n);
+      localStorage.setItem('theme', n);
+      document.querySelector('.theme-toggle').textContent = THEME_ICONS[n] || '🌙';
+    }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+    // 同步站名
+    fetch('/api/settings').then(r => r.json()).then(d => {
+      if (d.settings && d.settings.site_name) {
+        document.querySelector('.navbar h1 a').textContent = '📚 ' + d.settings.site_name;
+        document.title = '读者中心 - ' + d.settings.site_name;
+        if (d.settings.footer_text) document.getElementById('footer-text').textContent = d.settings.footer_text;
+      }
+    }).catch(() => {});
+
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+        t.classList.add('active');
+        const tab = t.dataset.tab;
+        document.getElementById('panel-login').style.display = tab === 'login' ? '' : 'none';
+        document.getElementById('panel-register').style.display = tab === 'register' ? '' : 'none';
+      });
+    });
+
+    function showMsg(id, text, type) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'msg ' + (type || '');
+    }
+
+    async function sendCode() {
+      const email = document.getElementById('reg-email').value.trim();
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showMsg('reg-msg', '请填写正确的邮箱', 'error');
+      const btn = document.getElementById('send-code-btn');
+      btn.disabled = true; btn.textContent = '发送中...';
+      try {
+        const res = await fetch('/api/user/auth?action=send-code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }), credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('reg-msg', '验证码已发送，请查收邮箱', 'success');
+        let cd = 60;
+        const t = setInterval(() => {
+          cd -= 1;
+          btn.textContent = cd > 0 ? `${cd}s 后重发` : '发送验证码';
+          if (cd <= 0) { clearInterval(t); btn.disabled = false; }
+        }, 1000);
+      } catch (e) {
+        btn.disabled = false; btn.textContent = '发送验证码';
+        showMsg('reg-msg', e.message, 'error');
+      }
+    }
+
+    async function doRegister() {
+      const email = document.getElementById('reg-email').value.trim();
+      const code = document.getElementById('reg-code').value.trim();
+      const username = document.getElementById('reg-username').value.trim();
+      const password = document.getElementById('reg-pass').value;
+      if (!email || !code || !username || !password) return showMsg('reg-msg', '请填写完整信息', 'error');
+      if (!/^\d{6}$/.test(code)) return showMsg('reg-msg', '验证码为 6 位数字', 'error');
+      if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+        return showMsg('reg-msg', '密码至少 8 位且包含字母和数字', 'error');
+      }
+      try {
+        const res = await fetch('/api/user/auth?action=verify', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code, username, password }), credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('reg-msg', data.message || '注册成功', 'success');
+        setTimeout(() => location.reload(), 1500);
+      } catch (e) { showMsg('reg-msg', e.message, 'error'); }
+    }
+
+    async function doUserLogin() {
+      const username = document.getElementById('login-user').value.trim();
+      const password = document.getElementById('login-pass').value;
+      if (!username || !password) return showMsg('login-msg', '请填写用户名和密码', 'error');
+      try {
+        const res = await fetch('/api/user/auth?action=login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }), credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        location.reload();
+      } catch (e) { showMsg('login-msg', e.message, 'error'); }
+    }
+
+    async function doUserLogout() {
+      if (!confirm('确定要退出登录？')) return;
+      try {
+        await fetch('/api/user/auth?action=logout', { method: 'POST', credentials: 'same-origin' });
+        location.reload();
+      } catch (e) { alert('退出失败：' + e.message); }
+    }
+
+    // 看广告奖励积分
+    document.getElementById('watch-ad-btn').addEventListener('click', async function() {
+      const btn = this;
+      if (btn.disabled) return;
+      btn.disabled = true; btn.textContent = '观看中 5s...';
+      let remain = 5;
+      const t = setInterval(() => {
+        remain -= 1;
+        if (remain > 0) btn.textContent = `观看中 ${remain}s...`;
+        if (remain <= 0) {
+          clearInterval(t);
+          btn.textContent = '领取奖励中...';
+        }
+      }, 1000);
+      await new Promise(r => setTimeout(r, 5000));
+      try {
+        const res = await fetch('/api/user/me?action=watch-ad', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot: 'user-center' }),
+          credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        btn.textContent = `+${data.creditsAdded} 积分`;
+        await loadUserCenter();
+      } catch (e) {
+        btn.textContent = '失败：' + e.message;
+      } finally {
+        setTimeout(() => { btn.disabled = false; btn.textContent = '看广告得积分'; }, 3000);
+      }
+    });
+
+    // 加载已登录状态
+    async function loadUserCenter() {
+      try {
+        const res = await fetch('/api/user/auth?action=me', { credentials: 'same-origin' });
+        if (!res.ok) {
+          document.getElementById('auth-area').style.display = '';
+          document.getElementById('user-area').style.display = 'none';
+          return;
+        }
+        const data = await res.json();
+        if (!data.authenticated) {
+          document.getElementById('auth-area').style.display = '';
+          document.getElementById('user-area').style.display = 'none';
+          return;
+        }
+        document.getElementById('auth-area').style.display = 'none';
+        document.getElementById('user-area').style.display = '';
+        document.getElementById('nav-user-info').innerHTML = '<span style="color:var(--accent)">👤 ' + esc(data.username) + '</span>';
+        document.getElementById('balance-value').textContent = data.balance;
+        // 余额与广告次数
+        const balRes = await fetch('/api/user/me?action=balance', { credentials: 'same-origin' });
+        const bal = await balRes.json();
+        document.getElementById('balance-sub').textContent = '今日广告剩余：' + (bal.adRemainingToday || 0) + ' 次';
+        const adBtn = document.getElementById('watch-ad-btn');
+        if ((bal.adRemainingToday || 0) <= 0) {
+          adBtn.disabled = true;
+          adBtn.textContent = '今日已达上限';
+        } else {
+          adBtn.disabled = false;
+          adBtn.textContent = '看广告得积分';
+        }
+        // 流水
+        if (bal.log && bal.log.length > 0) {
+          document.getElementById('balance-log').innerHTML = '<table><thead><tr><th>时间</th><th>变动</th><th>原因</th></tr></thead><tbody>' +
+            bal.log.map(l => {
+              const dt = l.created_at ? l.created_at.replace('T', ' ').slice(0, 16) : '-';
+              const cls = l.delta > 0 ? 'style="color:var(--color-success)"' : '';
+              return `<tr><td>${esc(dt)}</td><td ${cls}>${l.delta > 0 ? '+' : ''}${l.delta}</td><td>${esc(l.reason || '')}</td></tr>`;
+            }).join('') + '</tbody></table>';
+        } else {
+          document.getElementById('balance-log').innerHTML = '<div class="empty">暂无流水</div>';
+        }
+        // 订阅
+        const subRes = await fetch('/api/user/me?action=subscriptions', { credentials: 'same-origin' });
+        const subData = await subRes.json();
+        const subs = subData.subscriptions || [];
+        if (subs.length > 0) {
+          document.getElementById('subs-list').innerHTML = '<table><thead><tr><th>书名</th><th>章节数</th><th>金额</th><th>来源</th><th>订阅时间</th></tr></thead><tbody>' +
+            subs.map(s => `<tr>
+              <td><a href="/book.html?id=${s.book_id}">${esc(s.title)}</a></td>
+              <td>${s.chapter_count || 0} 章</td>
+              <td>${s.amount} 积分</td>
+              <td>${s.source === 'ad' ? '🎬 广告' : '💰 积分'}</td>
+              <td>${esc((s.created_at || '').slice(0, 10))}</td>
+            </tr>`).join('') + '</tbody></table>';
+        } else {
+          document.getElementById('subs-list').innerHTML = '<div class="empty">尚未订阅任何付费章节</div>';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadUserCenter();
+  </script>
+</body>
+</html>

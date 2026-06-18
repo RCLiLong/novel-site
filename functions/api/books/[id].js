@@ -1,8 +1,8 @@
-// GET /api/books/:id — 获取书籍详情 + 章节目录 + 标签
-import { validateId } from '../_utils.js';
+// GET /api/books/:id — 获取书籍详情 + 章节目录 + 标签 + 定价
+import { validateId, checkUserAdmin } from '../_utils.js';
 
 export async function onRequestGet(context) {
-  const { env, params } = context;
+  const { request, env, params } = context;
   const id = params.id;
 
   if (!validateId(id)) {
@@ -44,6 +44,23 @@ export async function onRequestGet(context) {
     tags = tagResults || [];
   } catch {}
   book.tags = tags;
+
+  // 定价与访问控制
+  const pricing = await env.DB.prepare('SELECT free_chapters, price FROM book_pricing WHERE book_id = ?').bind(id).first();
+  book.pricing = {
+    freeChapters: pricing?.free_chapters ?? 0,
+    price: pricing?.price ?? 0,
+  };
+
+  // 当前用户是否已订阅
+  const userAuth = await checkUserAdmin(request, env);
+  let userAccess = { isLoggedIn: userAuth.ok, unlocked: false };
+  if (userAuth.ok) {
+    const sub = await env.DB.prepare('SELECT id FROM subscriptions WHERE user_id = ? AND book_id = ?').bind(userAuth.userId, id).first();
+    userAccess.unlocked = !!sub;
+    userAccess.balance = userAuth.balance;
+  }
+  book.userAccess = userAccess;
 
   return Response.json({ book, chapters });
 }

@@ -21,7 +21,11 @@ export async function onRequestGet(context) {
   // GET /api/settings?check=register — 检查作者邮箱注册是否启用（公开）
   if (url.searchParams.get('check') === 'register') {
     const enabled = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'author_registration_enabled'").first();
-    return Response.json({ authorRegistrationEnabled: enabled?.value === 'true' });
+    const userEnabled = await env.DB.prepare("SELECT value FROM site_settings WHERE key = 'user_registration_enabled'").first();
+    return Response.json({
+      authorRegistrationEnabled: enabled?.value === 'true',
+      userRegistrationEnabled: userEnabled?.value === 'true',
+    });
   }
 
   // GET /api/settings?check=ads — 获取广告配置（公开，阅读页使用）

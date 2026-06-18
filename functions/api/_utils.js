@@ -35,7 +35,7 @@ export async function hashPassword(password) {
   return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
 }
 
-async function verifyPassword(password, stored) {
+export async function verifyPassword(password, stored) {
   // 兼容旧格式（纯64位hex = 无盐SHA-256）→ 验证后自动迁移
   if (!stored.startsWith('pbkdf2:')) {
     const oldHash = await sha256Legacy(password);
@@ -190,6 +190,108 @@ async function ensureSchema(env) {
     } catch {}
     try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_pending_reg_email ON pending_registrations(email, expires_at)').run(); } catch {}
 
+    // ===== 读者用户与订阅系统 =====
+    // 读者用户表（独立于管理员）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        email TEXT UNIQUE,
+        status TEXT NOT NULL DEFAULT 'active',
+        balance INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL').run(); } catch {}
+
+    // 读者登录会话
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_sessions (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id)').run(); } catch {}
+
+    // 读者待验证邮箱（与 pending_registrations 复用也可，但为了清晰分表）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS pending_user_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        code_hash TEXT NOT NULL,
+        username TEXT,
+        password_hash TEXT,
+        ip_hash TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        verified INTEGER NOT NULL DEFAULT 0,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_pending_user_reg_email ON pending_user_registrations(email, expires_at)').run(); } catch {}
+
+    // 书籍定价：前 N 章免费 + 后续价格（积分）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS book_pricing (
+        book_id INTEGER PRIMARY KEY,
+        free_chapters INTEGER NOT NULL DEFAULT 0,
+        price INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare("UPDATE book_pricing SET free_chapters = 0 WHERE free_chapters IS NULL").run(); } catch {}
+    try { await env.DB.prepare("UPDATE book_pricing SET price = 0 WHERE price IS NULL").run(); } catch {}
+
+    // 积分流水
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_balance_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        delta INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        related_book_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_balance_log_user ON user_balance_log(user_id, created_at)').run(); } catch {}
+
+    // 订阅（购买解锁）记录
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        book_id INTEGER NOT NULL,
+        amount INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'recharge',
+        expires_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_subs_user_book ON subscriptions(user_id, book_id)').run(); } catch {}
+
+    // 广告奖励记录（防刷：每用户每天最多 5 次）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS ad_rewards (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        ad_slot TEXT NOT NULL,
+        credits INTEGER NOT NULL,
+        ip_hash TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )`).run();
+    } catch {}
+    try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_ad_rewards_user ON ad_rewards(user_id, created_at)').run(); } catch {}
+
     // 所有迁移成功完成，标记为已完成
     _schemaEnsured = true;
   } catch (e) {
@@ -215,12 +317,53 @@ async function ensureDefaultAdmin(env) {
 }
 
 // Cookie 工具函数
-export function makeAuthCookie(token) {
-  return `auth_token=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`;
+export function makeAuthCookie(name, token, maxAgeSec = 604800) {
+  return `${name}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAgeSec}`;
 }
 
-export function clearAuthCookie() {
-  return 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
+export function clearAuthCookie(name = 'auth_token') {
+  return `${name}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+}
+
+// 读者用户 token 生成（与会话用同一生成器即可）
+export function generateUserToken() {
+  const bytes = new Uint8Array(TOKEN_LENGTH);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 校验读者（users 表）身份。返回 { ok, userId, username, email, balance, _token }
+export async function checkUserAdmin(request, env) {
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const match = cookieHeader.match(/(?:^|;\s*)user_token=([^;]+)/);
+  let token = null;
+  if (match && match[1] && match[1].length >= 10) token = match[1];
+  if (!token) {
+    const auth = request.headers.get('Authorization');
+    if (auth && auth.startsWith('Bearer ')) {
+      const t = auth.slice(7);
+      if (t && t.length >= 10) token = t;
+    }
+  }
+  if (!token) return { ok: false, reason: 'missing' };
+
+  const tokenHash = await sha256Hash(token);
+  const session = await env.DB.prepare(
+    "SELECT s.user_id, s.expires_at, u.username, u.email, u.balance, u.status FROM user_sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ?"
+  ).bind(tokenHash).first();
+  if (!session) return { ok: false, reason: 'invalid_token' };
+  if (new Date(session.expires_at) < new Date()) {
+    await env.DB.prepare('DELETE FROM user_sessions WHERE token = ?').bind(tokenHash).run();
+    return { ok: false, reason: 'expired' };
+  }
+  if (session.status === 'banned') {
+    return { ok: false, reason: 'banned' };
+  }
+  // 概率清理过期 session
+  if (Math.random() < CLEANUP_PROBABILITY) {
+    await env.DB.prepare("DELETE FROM user_sessions WHERE expires_at < datetime('now')").run().catch(() => {});
+  }
+  return { ok: true, userId: session.user_id, username: session.username, email: session.email, balance: session.balance, _token: token };
 }
 
 function getTokenFromRequest(request) {

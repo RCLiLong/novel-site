@@ -42,7 +42,7 @@ export async function onRequestPost(context) {
     }), {
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': makeAuthCookie(result.token)
+        'Set-Cookie': makeAuthCookie('auth_token', result.token)
       }
     });
   }

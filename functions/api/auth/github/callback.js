@@ -187,7 +187,7 @@ export async function onRequestGet(context) {
     headers: [
       ['Location', '/admin.html#github_login=success'],
       ['Set-Cookie', clearCookie],
-      ['Set-Cookie', makeAuthCookie(session.token)],
+      ['Set-Cookie', makeAuthCookie('auth_token', session.token)],
       ['Referrer-Policy', 'no-referrer'],
     ]
   });

@@ -18,6 +18,7 @@
   <div class="navbar">
     <h1><a href="/">📚 我的书架</a></h1>
     <nav>
+      <a href="/user.html" id="nav-user">读者</a>
       <a href="https://github.com/xingzihai/novel-site" target="_blank" rel="noopener" title="GitHub">GitHub</a>
       <a href="/admin.html">管理</a>
       <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">🌙</button>
@@ -63,6 +64,11 @@
     }
 
     // 加载站点设置
+    let _downloadEnabled = false;
+    function applyDownloadVisibility() {
+      const link = document.getElementById('export-link');
+      if (link) link.style.display = _downloadEnabled ? '' : 'none';
+    }
     fetch('/api/settings').then(r => r.json()).then(d => {
       const s = d.settings || {};
       if (s.site_name) document.querySelector('.navbar h1 a').textContent = '📚 ' + s.site_name;
@@ -72,12 +78,10 @@
         if (el) el.textContent = s.footer_text;
       }
       // 下载功能开关（默认关闭）
-      const downloadOn = s.download_enabled === true;
+      _downloadEnabled = s.download_enabled === true;
+      applyDownloadVisibility();
       // 监控 DOM 变化以处理动态渲染的导出链接
-      const observer = new MutationObserver(() => {
-        const link = document.getElementById('export-link');
-        if (link) link.style.display = downloadOn ? '' : 'none';
-      });
+      const observer = new MutationObserver(applyDownloadVisibility);
       observer.observe(document.body, { childList: true, subtree: true });
     }).catch(() => {});
 
@@ -105,6 +109,28 @@
 
         const uploaderHtml = b.uploader ? `<div class="uploader" style="font-size:13px;color:var(--text-light);margin-top:4px">${b.uploader_avatar ? '<img src="'+esc(b.uploader_avatar)+'" style="width:16px;height:16px;border-radius:50%;vertical-align:middle;margin-right:3px">' : ''}上传：${esc(b.uploader)}</div>` : '';
 
+        // 定价 + 订阅状态
+        const pricing = b.pricing || { freeChapters: 0, price: 0 };
+        const userAccess = b.userAccess || { isLoggedIn: false, unlocked: false };
+        const totalChapters = chapters.length;
+        const paywallChapter = pricing.price > 0 && pricing.freeChapters < totalChapters ? pricing.freeChapters + 1 : null;
+        let pricingHtml = '';
+        if (pricing.price > 0) {
+          if (userAccess.unlocked) {
+            pricingHtml = `<div class="pricing-box" style="background:var(--color-success-bg,#d4edda);border:1px solid var(--color-success-border);color:var(--color-success,#15803d);padding:10px 14px;border-radius:var(--radius);font-size:14px;margin-top:12px">✅ 已订阅（支付 ${pricing.price} 积分）</div>`;
+          } else {
+            pricingHtml = `<div class="pricing-box" style="background:var(--bg);border:1px solid var(--border);padding:12px 14px;border-radius:var(--radius);font-size:14px;margin-top:12px">
+              <div style="color:var(--text-light);font-size:13px">📖 前 <strong>${pricing.freeChapters}</strong> 章免费，第 <strong>${paywallChapter}</strong> 章起需订阅</div>
+              <div style="margin-top:6px;display:flex;gap:8px;align-items:center">
+                <span style="font-size:18px;font-weight:600;color:var(--accent-dark)">${pricing.price} 积分</span>
+                <button class="btn" onclick="unlockBook(${b.id}, ${pricing.price})" style="margin-left:auto">${userAccess.isLoggedIn ? '立即订阅' : '登录后订阅'}</button>
+              </div>
+            </div>`;
+          }
+        } else if (pricing.freeChapters > 0 && pricing.freeChapters < totalChapters) {
+          pricingHtml = `<div class="pricing-box" style="background:var(--bg);border:1px solid var(--border);padding:8px 14px;border-radius:var(--radius);font-size:13px;color:var(--text-light);margin-top:12px">前 ${pricing.freeChapters} 章免费阅读</div>`;
+        }
+
         let html;
         if (b.cover_key) {
           html = `
@@ -116,6 +142,7 @@
                   ${b.author ? `<div class="author">作者：${esc(b.author)}</div>` : ''}
                   ${uploaderHtml}
                   ${b.description ? `<div class="desc">${cleanDesc(b.description)}</div>` : ''}
+                  ${pricingHtml}
                   ${tagsBlock}
                 </div>
               </div>
@@ -196,6 +223,25 @@
         el.innerHTML = `<div class="msg msg-error">${esc(e.message)}</div>`;
       }
     }
+
+    // 解锁付费书
+    async function unlockBook(bookId, price) {
+      if (!confirm(`确认订阅本书？（将消耗 ${price} 积分）`)) return;
+      try {
+        const res = await fetch('/api/user/me?action=unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ book_id: bookId }),
+          credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (res.status === 401) { alert('请先登录读者账号'); location.href = '/user.html'; return; }
+        if (!res.ok) throw new Error(data.error);
+        alert('订阅成功！');
+        location.reload();
+      } catch (e) { alert(e.message); }
+    }
+
     function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
     function cleanDesc(s) {
       if (!s) return '';
@@ -315,52 +361,28 @@
     }
 
     async function exportBook(bookId, title, author) {
+      // 优先调用服务端导出端点（受 download_enabled 与付费门槛双重控制）
       try {
-        const res = await fetch(`/api/books/${bookId}`);
-        const data = await res.json();
-        const chapters = data.chapters || [];
-        if (chapters.length === 0) return alert('没有章节可导出');
-        
-        // 使用流式处理避免大文件内存溢出
-        const CHUNK_SIZE = 100; // 每次处理的章节数
-        const sep = '\n\n' + '='.repeat(40) + '\n\n';
-        const header = `《${title}》\n${author ? '作者：'+author+'\n' : ''}\n`;
-        const BOM = '\uFEFF';
-        
-        // 创建可写流
-        const chunks = [BOM + header];
-        let processedCount = 0;
-        
-        // 分块处理章节，避免一次性加载所有内容到内存
-        for (let i = 0; i < chapters.length; i += CHUNK_SIZE) {
-          const batch = chapters.slice(i, i + CHUNK_SIZE);
-          const batchPromises = batch.map(async (ch) => {
-            const r = await fetch(`/api/chapters/${ch.id}`);
-            const d = await r.json();
-            return ch.title + '\n\n' + d.content;
-          });
-          const batchResults = await Promise.all(batchPromises);
-          
-          // 添加分隔符
-          if (processedCount > 0) {
-            chunks.push(sep);
-          }
-          chunks.push(...batchResults);
-          processedCount += batchResults.length;
-          
-          // 让出主线程，保持UI响应
-          await new Promise(resolve => setTimeout(resolve, 0));
+        if (!_downloadEnabled) {
+          return alert('下载功能已被管理员关闭');
         }
-        
-        // 使用 Blob 构造函数的分块模式，减少内存峰值
-        const blob = new Blob(chunks, {type:'text/plain;charset=utf-8'});
+        const btn = document.activeElement;
+        if (btn && btn.textContent) btn.textContent = '导出中...';
+        const res = await fetch(`/api/books/${bookId}/download?format=txt`, { credentials: 'same-origin' });
+        if (!res.ok) {
+          let err = '导出失败';
+          try { const d = await res.json(); err = d.error || err; } catch {}
+          return alert(err);
+        }
+        const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = (title + (author ? '_'+author : '') + '.txt').replace(/[<>:"/\\|?*]/g,'_');
+        a.download = (title + (author ? '_' + author : '') + '.txt').replace(/[<>:"/\\|?*]/g, '_');
         a.click();
         URL.revokeObjectURL(url);
-      } catch (e) { alert('导出失败：'+e.message); }
+        if (btn) btn.textContent = '✅ 已导出';
+      } catch (e) { alert('导出失败：' + e.message); }
     }
   </script>
 </body>

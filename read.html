@@ -20,6 +20,7 @@
     <h1><a href="/">📚 我的书架</a></h1>
     <nav>
       <a href="#" id="back-link">返回目录</a>
+      <a href="/user.html" id="nav-user-link">读者</a>
       <span id="nav-user"></span>
     </nav>
   </div>
@@ -846,6 +847,13 @@
     });
 
     // ===== 加载站点设置 =====
+    let _downloadEnabled = false;
+    function applyDownloadVisibility() {
+      ['export-btn', 'download-book-btn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = _downloadEnabled ? '' : 'none';
+      });
+    }
     fetch('/api/settings').then(r => r.json()).then(d => {
       const s = d.settings || {};
       if (s.site_name) document.querySelector('.navbar h1 a').textContent = '📚 ' + s.site_name;
@@ -855,11 +863,11 @@
         if (el) el.textContent = s.footer_text;
       }
       // 下载功能开关（默认关闭）
-      const downloadOn = s.download_enabled === true;
-      ['export-btn', 'download-book-btn'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = downloadOn ? '' : 'none';
-      });
+      _downloadEnabled = s.download_enabled === true;
+      applyDownloadVisibility();
+      // 监控 DOM 变化：章节切换后再次隐藏/显示
+      const obs = new MutationObserver(applyDownloadVisibility);
+      obs.observe(document.body, { childList: true, subtree: true });
     }).catch(() => {});
 
     // ===== 加载自定义字体 =====
@@ -903,7 +911,21 @@
           data = prefetchedNext;
           prefetchedNext = null;
         } else {
-          const res = await fetch(`/api/chapters/${chapterId}`);
+          const res = await fetch(`/api/chapters/${chapterId}`, { credentials: 'same-origin' });
+          if (res.status === 402) {
+            // 付费门槛
+            const pd = await res.json();
+            el.innerHTML = `<div class="paywall-box" style="text-align:center;padding:60px 20px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius)">
+              <div style="font-size:48px;margin-bottom:12px">🔒</div>
+              <h2 style="margin:0 0 8px">本章为付费章节</h2>
+              <p style="color:var(--text-light);margin:0 0 20px">${esc(pd.paywall?.unlockHint || '请登录并购买订阅后阅读')}</p>
+              <p style="font-size:14px;margin:0 0 20px">前 <strong>${pd.paywall?.freeChapters || 0}</strong> 章免费，本章起需 <strong>${pd.paywall?.price || 0}</strong> 积分订阅</p>
+              <a class="btn" href="/user.html" style="display:inline-block;text-decoration:none">前往读者中心</a>
+              <a class="btn btn-sm" href="javascript:history.back()" style="margin-left:8px;text-decoration:none">返回上页</a>
+            </div>`;
+            document.title = '付费章节 - 我的书架';
+            return;
+          }
           if (!res.ok) throw new Error(res.status === 404 ? '章节不存在' : '加载失败');
           data = await res.json();
         }
@@ -965,22 +987,30 @@
         // 缓存全书按钮
         document.getElementById('download-book-btn').addEventListener('click', async (e) => {
           e.preventDefault();
+          if (!_downloadEnabled) {
+            alert('下载功能已被管理员关闭');
+            return;
+          }
           const btn = e.target;
           try {
-            btn.textContent = '📥 获取目录...';
-            const bRes = await fetch(`/api/books/${c.book_id}`);
-            const bData = await bRes.json();
-            const chs = bData.chapters || [];
-            if (chs.length === 0) { btn.textContent = '📥 无章节'; return; }
-            let done = 0;
-            for (const ch of chs) {
-              await fetch(`/api/chapters/${ch.id}`);
-              done++;
-              btn.textContent = `📥 ${done}/${chs.length}`;
+            btn.textContent = '导出中...';
+            const res = await fetch(`/api/books/${c.book_id}/download?format=txt`, { credentials: 'same-origin' });
+            if (!res.ok) {
+              let err = '导出失败';
+              try { const d = await res.json(); err = d.error || err; } catch {}
+              btn.textContent = '❌ ' + err;
+              return;
             }
-            btn.textContent = '✅ 缓存完成';
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = (c.book_title || 'book') + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+            btn.textContent = '✅ 导出完成';
           } catch (err) {
-            btn.textContent = '❌ 缓存失败';
+            btn.textContent = '❌ 导出失败';
           }
         });
 
@@ -1076,6 +1106,9 @@
     }
 
     function exportThis() {
+      if (!_downloadEnabled) {
+        return alert('下载功能已被管理员关闭');
+      }
       if (!window._chapterData) return;
       const BOM = '\uFEFF';
       const blob = new Blob([BOM + window._chapterData.content], {type:'text/plain;charset=utf-8'});

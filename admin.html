@@ -381,6 +381,21 @@
               允许读者批注
             </label>
           </div>
+          <details style="margin-top:8px">
+            <summary style="cursor:pointer;font-size:13px;color:var(--accent)">💰 付费订阅设置（可选）</summary>
+            <div style="background:var(--bg);padding:10px;border-radius:var(--radius);margin-top:8px;font-size:13px;color:var(--text-light)">
+              设置后，读者需先订阅才能阅读指定章节。订阅价格使用 <strong>积分</strong>（用户看广告或管理员充值获得）。
+            </div>
+            <div class="form-group" style="margin-top:8px">
+              <label>免费章节数（0 表示全部付费）</label>
+              <input type="number" id="edit-free-chapters" min="0" max="9999" value="0" style="width:120px">
+            </div>
+            <div class="form-group">
+              <label>后续章节价格（积分）</label>
+              <input type="number" id="edit-book-price" min="0" max="999999" value="0" style="width:120px">
+              <div style="font-size:12px;color:var(--text-light);margin-top:2px">设为 0 表示该书完全免费</div>
+            </div>
+          </details>
           <button class="btn" id="save-book-edit-btn">保存</button>
         </div>
       </div>
@@ -549,6 +564,12 @@
           <div style="font-size:12px;color:var(--text-light);margin-top:2px">启用后登录页会显示"作者注册"入口，注册后需管理员审核</div>
         </div>
         <div class="form-group">
+          <label>
+            <input type="checkbox" id="user-reg-enabled"> 启用读者邮箱注册
+          </label>
+          <div style="font-size:12px;color:var(--text-light);margin-top:2px">启用后首页导航显示"读者"入口，注册即送 10 积分</div>
+        </div>
+        <div class="form-group">
           <label>发件人（from）</label>
           <input type="text" id="email-from" placeholder='例如：noreply@example.com 或 "小说站 <noreply@example.com>"' maxlength="200">
           <div style="font-size:12px;color:var(--text-light);margin-top:2px">需要在 Resend 后台已验证的域名邮箱</div>
@@ -636,6 +657,34 @@
             </label>
           </div>
           <div id="author-user-msg"></div>
+        </details>
+      </div>
+
+      <!-- 读者用户管理（仅超管可见） -->
+      <div class="admin-section super-admin-only" style="display:none">
+        <h3>👥 读者用户管理</h3>
+        <p style="color:var(--text-light);font-size:13px;margin-bottom:12px">管理读者账号、调整积分余额、封禁账号。</p>
+        <div id="users-list" style="margin-bottom:12px"></div>
+        <details>
+          <summary style="cursor:pointer;font-size:14px;color:var(--accent)">💰 手动调整积分（充值/扣款）</summary>
+          <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;margin-top:8px;align-items:end">
+            <div>
+              <label style="font-size:12px;color:var(--text-light)">用户ID</label>
+              <input type="number" id="user-credit-id" min="1" style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-light)">变动（正=充值，负=扣款）</label>
+              <input type="number" id="user-credit-delta" placeholder="例如 100 或 -50" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+            </div>
+            <div>
+              <label style="font-size:12px;color:var(--text-light)">备注（可选）</label>
+              <div style="display:flex;gap:6px">
+                <input type="text" id="user-credit-reason" placeholder="如：活动奖励" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+                <button class="btn" onclick="adjustUserCredits()">确认</button>
+              </div>
+            </div>
+          </div>
+          <div id="user-credit-msg" style="margin-top:8px"></div>
         </details>
       </div>
 
@@ -796,7 +845,7 @@
       const deactivateBtn = document.getElementById('deactivate-account-btn');
       if (deactivateBtn) deactivateBtn.style.display = (role === 'demo' || role === 'author') ? '' : 'none';
       refreshAllBooks(); loadSettings(); loadStats(); loadFontList();
-      if (role === 'super_admin') { loadAdminUsers(); loadGitHubConfig(); loadAdConfigAdmin(); loadEmailConfig(); }
+      if (role === 'super_admin') { loadAdminUsers(); loadGitHubConfig(); loadAdConfigAdmin(); loadEmailConfig(); loadReaders(); }
       if (isAdminOrAbove) { loadAuthors(); }
     }
 
@@ -979,6 +1028,7 @@
         const data = await res.json();
         if (!res.ok) return;
         document.getElementById('author-reg-enabled').checked = !!data.registrationEnabled;
+        document.getElementById('user-reg-enabled').checked = !!data.userRegistrationEnabled;
         document.getElementById('email-from').value = data.from || '';
         document.getElementById('email-subject').value = data.subject || '';
         document.getElementById('email-key-status').textContent = data.hasApiKey ? '（已配置 ✅）' : '（未配置）';
@@ -986,13 +1036,14 @@
     }
     async function saveEmailConfig() {
       const registrationEnabled = document.getElementById('author-reg-enabled').checked;
+      const userRegistrationEnabled = document.getElementById('user-reg-enabled').checked;
       const from = document.getElementById('email-from').value.trim();
       const apiKey = document.getElementById('email-api-key').value.trim();
       const subject = document.getElementById('email-subject').value.trim();
       if (registrationEnabled && !from) return showMsg('email-config-msg', '启用注册需填写发件人邮箱', 'error');
       try {
         const res = await api('POST', '/api/admin/settings?section=email', {
-          registrationEnabled, from, apiKey: apiKey || undefined, subject
+          registrationEnabled, userRegistrationEnabled, from, apiKey: apiKey || undefined, subject
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -1817,6 +1868,86 @@
       } catch(e) { alert(e.message); loadAdminUsers(); }
     }
 
+    // ===== 读者用户管理 =====
+    let _readersCache = [];
+    async function loadReaders() {
+      const el = document.getElementById('users-list');
+      if (!el) return;
+      try {
+        const res = await api('GET', '/api/admin/users-user');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        const users = data.users || [];
+        _readersCache = users;
+        if (users.length === 0) {
+          el.innerHTML = '<p style="color:var(--text-light);font-size:13px">暂无读者账号</p>';
+          return;
+        }
+        el.innerHTML = '<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr style="border-bottom:2px solid var(--border)"><th style="text-align:left;padding:6px">ID</th><th style="text-align:left;padding:6px">用户名</th><th style="text-align:left;padding:6px">邮箱</th><th style="text-align:right;padding:6px">积分</th><th style="text-align:left;padding:6px">订阅</th><th style="text-align:left;padding:6px">状态</th><th style="text-align:left;padding:6px">注册时间</th><th style="text-align:right;padding:6px">操作</th></tr></thead><tbody>' +
+          users.map(u => {
+            const statusBadge = u.status === 'banned' ? '<span style="color:#e74c3c">🚫 已封禁</span>' : '<span style="color:#15803d">✅ 正常</span>';
+            return `<tr data-id="${u.id}" data-name="${esc(u.username)}">
+              <td style="padding:6px;font-family:monospace">${u.id}</td>
+              <td style="padding:6px">${esc(u.username)}</td>
+              <td style="padding:6px;font-size:12px;color:var(--text-light)">${esc(u.email || '-')}</td>
+              <td style="padding:6px;text-align:right;font-weight:600;color:var(--accent-dark)">${u.balance}</td>
+              <td style="padding:6px">${u.book_count || 0} 本</td>
+              <td style="padding:6px">${statusBadge}</td>
+              <td style="padding:6px;font-size:12px;color:var(--text-light)">${u.created_at ? u.created_at.slice(0, 10) : '-'}</td>
+              <td style="padding:6px;text-align:right">
+                <button class="btn btn-sm btn-toggle-user-status" data-id="${u.id}" data-status="${u.status}" style="font-size:11px;padding:1px 6px">${u.status === 'banned' ? '解封' : '封禁'}</button>
+                <button class="btn btn-sm btn-delete-reader" data-id="${u.id}" style="font-size:11px;padding:1px 6px;background:#e74c3c;color:#fff;margin-left:2px">删除</button>
+              </td>
+            </tr>`;
+          }).join('') + '</tbody></table>';
+      } catch (e) {
+        el.innerHTML = `<p style="color:#e74c3c;font-size:13px">加载失败：${esc(e.message)}</p>`;
+      }
+    }
+
+    document.getElementById('users-list').addEventListener('click', async function(e) {
+      const id = Number(e.target.dataset.id);
+      if (!id) return;
+      if (e.target.classList.contains('btn-toggle-user-status')) {
+        const cur = e.target.dataset.status;
+        const next = cur === 'banned' ? 'active' : 'banned';
+        if (!confirm(`确定${next === 'banned' ? '封禁' : '解封'}该用户？`)) return;
+        try {
+          const res = await api('PUT', '/api/admin/users-user', { id, status: next });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+          loadReaders();
+        } catch (e) { alert(e.message); }
+      } else if (e.target.classList.contains('btn-delete-reader')) {
+        const tr = e.target.closest('tr[data-id]');
+        const name = tr?.dataset.name;
+        if (!confirm(`确定删除读者 ${name}？其订阅与积分将被清除。`)) return;
+        try {
+          const res = await api('DELETE', '/api/admin/users-user', { id });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+          loadReaders();
+        } catch (e) { alert(e.message); }
+      }
+    });
+
+    async function adjustUserCredits() {
+      const id = Number(document.getElementById('user-credit-id').value);
+      const delta = Number(document.getElementById('user-credit-delta').value);
+      const reason = document.getElementById('user-credit-reason').value.trim();
+      if (!id || !Number.isInteger(id) || id <= 0) return showMsg('user-credit-msg', '请填写有效用户ID', 'error');
+      if (!Number.isInteger(delta) || delta === 0) return showMsg('user-credit-msg', '请填写非零整数变动值', 'error');
+      try {
+        const res = await api('POST', '/api/admin/users-user', { id, credits: delta, reason });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showMsg('user-credit-msg', data.message, 'success');
+        document.getElementById('user-credit-delta').value = '';
+        document.getElementById('user-credit-reason').value = '';
+        loadReaders();
+      } catch (e) { showMsg('user-credit-msg', e.message, 'error'); }
+    }
+
     // ===== 作者管理 =====
     let _authorsCache = [];
     let _currentAuthorTab = 'active';
@@ -2561,7 +2692,7 @@
       // 批注开关：先用传入的 book 对象值（🟢-8: 兼容下架/回收站书籍）
       document.getElementById('edit-annotation-enabled').checked = !!book.annotation_enabled;
 
-      // 获取当前书籍标签
+      // 获取当前书籍标签 + 定价
       try {
         const res = await fetch(`/api/books/${book.id}`);
         const data = await res.json();
@@ -2569,6 +2700,11 @@
         // 如果 API 返回了更新的值，覆盖
         if (data.book.annotation_enabled !== undefined) {
           document.getElementById('edit-annotation-enabled').checked = !!data.book.annotation_enabled;
+        }
+        // 定价
+        if (data.book.pricing) {
+          document.getElementById('edit-free-chapters').value = data.book.pricing.freeChapters || 0;
+          document.getElementById('edit-book-price').value = data.book.pricing.price || 0;
         }
       } catch { _editBookTags = []; }
       renderEditBookTags();
@@ -2672,6 +2808,13 @@
 
         // 保存标签
         await api('PUT', '/api/admin/book-tags', { book_id: _editBookId, tag_ids: _editBookTags });
+
+        // 保存定价
+        const freeChapters = Number(document.getElementById('edit-free-chapters').value) || 0;
+        const bookPrice = Number(document.getElementById('edit-book-price').value) || 0;
+        await api('PUT', `/api/admin/books/${_editBookId}/pricing`, {
+          free_chapters: freeChapters, price: bookPrice
+        });
 
         bookEditOverlay.classList.remove('active');
         refreshAllBooks();
