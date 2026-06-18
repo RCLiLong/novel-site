@@ -8,7 +8,7 @@ import {
   parseJsonBody, sha256Hash, hashPassword, verifyPassword,
   makeAuthCookie, clearAuthCookie,
   checkUserAdmin, generateUserToken
-} from '../../_utils.js';
+} from '../_utils.js';
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_SEND_PER_HOUR_EMAIL = 5;

@@ -1,7 +1,7 @@
 // GET /api/books/:id/download?format=txt|json
 // 服务端导出：受 download_enabled 后台开关 + 付费门槛双重控制
 // 即使前端绕过，download_enabled 关闭时仍返回 403
-import { validateId, checkUserAdmin } from '../_utils.js';
+import { validateId, checkUserAdmin } from '../../_utils.js';
 
 export async function onRequestGet(context) {
   const { request, env, params } = context;

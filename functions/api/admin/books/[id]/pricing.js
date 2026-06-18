@@ -1,7 +1,7 @@
 // 书籍定价管理（超管 + 书籍所有者可管理）
 // GET  /api/admin/books/:id/pricing — 读取
 // PUT  /api/admin/books/:id/pricing — 更新 free_chapters / price
-import { checkAdmin, requireMinRole, checkBookOwnership, validateId, parseJsonBody } from '../../_utils.js';
+import { checkAdmin, requireMinRole, checkBookOwnership, validateId, parseJsonBody } from '../../../_utils.js';
 
 const MAX_FREE_CHAPTERS = 100000;     // 单本最多允许的免费章节
 const MAX_PRICE = 1000000;             // 积分上限
